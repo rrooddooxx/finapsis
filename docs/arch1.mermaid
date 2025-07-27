@@ -1,0 +1,45 @@
+flowchart TB
+ subgraph subGraph0["User Interfaces"]
+        WA["WhatsApp Client"]
+        WEB["React Web App"]
+  end
+ subgraph subGraph1["Entry Points"]
+        TWILIO["Twilio Webhook"]
+        VITE["Vite Dev Server"]
+  end
+ subgraph subGraph2["API Layer - Hono on Bun"]
+        API["Main API Server"]
+        MSG["Message Processor"]
+        AGENT["Agent Orchestrator"]
+  end
+ subgraph subGraph3["Supabase Services"]
+        AUTH["Supabase Auth"]
+        DB[("PostgreSQL + pgvector")]
+        STORAGE["Supabase Storage"]
+        REALTIME["Supabase Realtime"]
+        EDGE["Edge Functions"]
+  end
+ subgraph subGraph4["AI Components"]
+        LLM["LLM API<br>OpenAI/Claude"]
+        EMB["Embedding Service"]
+        RAG["RAG Pipeline"]
+  end
+ subgraph subGraph5["Background Jobs"]
+        QUEUE["BullMQ + Redis"]
+        SCRAPER["Video Scraper"]
+        ANALYZER["Financial Analyzer"]
+  end
+    WA --> TWILIO
+    WEB --> VITE
+    VITE --> API
+    TWILIO --> API
+    API --> MSG & AUTH & DB & STORAGE & QUEUE
+    MSG --> AGENT
+    AGENT --> LLM & RAG
+    RAG --> EMB & DB
+    QUEUE --> SCRAPER & ANALYZER
+    SCRAPER --> DB
+    ANALYZER --> DB
+    DB --> REALTIME
+    REALTIME --> WEB
+    subGraph3 --> n1["Untitled Node"]

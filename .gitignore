@@ -9,3 +9,7 @@ yarn-error.log*
 .pnp.js
 
 .vscode/*
+.idea/*
+.qodo/*
+.DS_Store
+**/.DS_Store

@@ -1,0 +1,190 @@
+graph LR
+    subgraph "1. User Layer"
+        WEB_APP[React Web App<br/>Browser]
+        WHATSAPP[WhatsApp<br/>Users]
+    end
+
+    subgraph "2. Entry Points"
+        TWILIO[Twilio API<br/>WhatsApp Business]
+    end
+
+    subgraph "3. Oracle Cloud VM"
+        subgraph "Docker Containers"
+            NGINX[Nginx<br/>:80<br/>Serve React Build]
+            HONO[Hono API Server<br/>:3000<br/>TypeScript/Bun]
+            REDIS[(Redis<br/>:6379<br/>Job Queue)]
+            WORKERS[Background Workers<br/>BullMQ]
+        end
+    end
+
+    subgraph "4. Core Services"
+        subgraph "AI Processing Flow"
+            CHAT_SERVICE[Chat Service<br/>Handles User Messages]
+            AGENT_ORCHESTRATOR[Agent Orchestrator<br/>Decides Which Agents]
+            LLM_PROCESSOR[LLM Processor<br/>Final Response Generation]
+            RAG_PIPELINE[RAG Pipeline<br/>Knowledge Retrieval]
+        end
+    end
+
+    subgraph "5. AI Agents"
+        BALANCE_AGENT[Balance Agent<br/>Returns: balance data]
+        BUDGET_AGENT[Budget Agent<br/>Returns: budget analysis]
+        GOAL_AGENT[Goal Planner<br/>Returns: savings plan]
+        DEBT_AGENT[Debt Analyzer<br/>Returns: debt status]
+    end
+
+    subgraph "6. Background Jobs"
+        MSG_PROCESSOR[Message Processor]
+        RECEIPT_OCR[Receipt Extractor]
+        VIDEO_SCRAPER[Video Scraper]
+        TRANSACTION_ANALYZER[Transaction Analyzer]
+    end
+
+    subgraph "7. Oracle Cloud Services"
+        OCI_STORAGE[OCI Object Storage<br/>User Uploads<br/>Receipts/Images]
+
+        subgraph "OCI Generative AI"
+            OCI_LLM[OCI Generative AI<br/>Cohere Command<br/>Meta Llama 2]
+            OCI_EMBED[OCI Embedding<br/>Cohere Embed]
+        end
+
+        OCI_VISION[OCI Vision<br/>OCR Service<br/>Document AI]
+        OCI_SPEECH[OCI Speech<br/>Transcription<br/>for Voice Notes]
+    end
+
+    subgraph "8. External Services"
+        subgraph "Supabase Cloud"
+            SUPABASE_AUTH[Supabase Auth<br/>Phone/OTP]
+
+            subgraph "PostgreSQL + pgvector"
+                subgraph "Chat Tables"
+                    CONVERSATIONS[conversations<br/>id, user_id, created_at]
+                    MESSAGES[messages<br/>id, conversation_id,<br/>role, content, metadata]
+                end
+
+                subgraph "Financial Tables"
+                    TRANSACTIONS[transactions<br/>id, user_id, amount,<br/>category, date]
+                    GOALS[financial_goals<br/>id, user_id, target_amount,<br/>current_amount]
+                    USER_PROFILES[user_profiles<br/>id, phone, income,<br/>preferences]
+                end
+
+                subgraph "AI Tables"
+                    KNOWLEDGE_BASE[knowledge_base<br/>id, content,<br/>embedding vector,<br/>source, topic]
+                    AGENT_CACHE[agent_results<br/>id, user_id, agent_name,<br/>results, timestamp]
+                end
+            end
+
+            SUPABASE_REALTIME[Realtime<br/>WebSocket]
+        end
+    end
+
+    subgraph "9. CI/CD"
+        GITHUB[GitHub Actions]
+        DOCKER_HUB[Docker Hub<br/>Registry]
+    end
+
+%% User Flows
+    WEB_APP -->|:80| NGINX
+    WEB_APP -->|API :3000| HONO
+    WHATSAPP -->|Messages| TWILIO
+    TWILIO -->|Webhook| HONO
+
+%% API to Chat Service
+    HONO -->|1. User Message| CHAT_SERVICE
+
+%% Chat Service Flow (numbered for clarity)
+    CHAT_SERVICE -->|2. Analyze Intent| AGENT_ORCHESTRATOR
+    CHAT_SERVICE -->|6. Get Context| RAG_PIPELINE
+    CHAT_SERVICE -->|7. Generate Response| LLM_PROCESSOR
+
+%% Agent Orchestrator Flow
+    AGENT_ORCHESTRATOR -->|3. Call Agents| BALANCE_AGENT
+    AGENT_ORCHESTRATOR -->|3. Call Agents| BUDGET_AGENT
+    AGENT_ORCHESTRATOR -->|3. Call Agents| GOAL_AGENT
+    AGENT_ORCHESTRATOR -->|3. Call Agents| DEBT_AGENT
+
+%% Agents Return Data
+    BALANCE_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
+    BUDGET_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
+    GOAL_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
+    DEBT_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
+
+%% Orchestrator Returns to Chat Service
+    AGENT_ORCHESTRATOR -->|5. Agent Results| CHAT_SERVICE
+
+%% LLM Processing - Now using OCI
+    LLM_PROCESSOR -->|8. Call LLM| OCI_LLM
+    LLM_PROCESSOR -->|9. Final Response| CHAT_SERVICE
+
+%% Chat Service Returns Response
+    CHAT_SERVICE -->|10. Stream Response| HONO
+
+%% Database Interactions
+    CHAT_SERVICE --> MESSAGES
+    CHAT_SERVICE --> CONVERSATIONS
+
+%% Agent Database Writes
+    BALANCE_AGENT --> TRANSACTIONS
+    BALANCE_AGENT --> AGENT_CACHE
+    BUDGET_AGENT --> TRANSACTIONS
+    BUDGET_AGENT --> AGENT_CACHE
+    GOAL_AGENT --> GOALS
+    GOAL_AGENT --> AGENT_CACHE
+    DEBT_AGENT --> TRANSACTIONS
+    DEBT_AGENT --> AGENT_CACHE
+
+%% RAG Database Access - Now using OCI Embeddings
+    RAG_PIPELINE --> KNOWLEDGE_BASE
+    RAG_PIPELINE -->|Generate Embeddings| OCI_EMBED
+
+%% Queue to Workers
+    REDIS --> WORKERS
+    WORKERS --> MSG_PROCESSOR
+    WORKERS --> RECEIPT_OCR
+    WORKERS --> VIDEO_SCRAPER
+    WORKERS --> TRANSACTION_ANALYZER
+
+%% Worker Database Access
+    MSG_PROCESSOR --> TRANSACTIONS
+    RECEIPT_OCR --> TRANSACTIONS
+    VIDEO_SCRAPER --> KNOWLEDGE_BASE
+    TRANSACTION_ANALYZER --> TRANSACTIONS
+
+%% OCI AI Services Usage
+    RECEIPT_OCR -->|Extract Text| OCI_VISION
+    MSG_PROCESSOR -->|Transcribe Audio| OCI_SPEECH
+    VIDEO_SCRAPER -->|Generate Embeddings| OCI_EMBED
+
+%% Storage Flow
+    HONO -->|Upload Files| OCI_STORAGE
+    MSG_PROCESSOR -->|Store Receipts| OCI_STORAGE
+    RECEIPT_OCR --> OCI_STORAGE
+
+%% Realtime Flow
+    MESSAGES -->|Changes| SUPABASE_REALTIME
+    SUPABASE_REALTIME -->|WebSocket| WEB_APP
+
+%% Auth Flow
+    WEB_APP --> SUPABASE_AUTH
+    SUPABASE_AUTH -->|SMS OTP| TWILIO
+    HONO --> SUPABASE_AUTH
+
+%% CI/CD Flow
+    GITHUB -->|Build & Deploy| DOCKER_HUB
+    DOCKER_HUB -->|Pull Images| NGINX
+    DOCKER_HUB -->|Pull Images| HONO
+
+%% Styling
+    classDef oracle fill:#0a807e,stroke:#333,stroke-width:2px
+    classDef external fill:#911fc2,stroke:#333,stroke-width:2px
+    classDef ai fill:#666,stroke:#333,stroke-width:2px
+    classDef user fill:#b80251,stroke:#333,stroke-width:2px
+    classDef cicd fill:#302dbd,stroke:#333,stroke-width:2px
+    classDef db fill:#2a5a8a,stroke:#333,stroke-width:2px
+
+    class NGINX,HONO,WORKERS,REDIS,OCI_STORAGE,OCI_LLM,OCI_EMBED,OCI_VISION,OCI_SPEECH oracle
+    class TWILIO,SUPABASE_AUTH,SUPABASE_REALTIME external
+    class CHAT_SERVICE,AGENT_ORCHESTRATOR,RAG_PIPELINE,BALANCE_AGENT,BUDGET_AGENT,GOAL_AGENT,DEBT_AGENT,LLM_PROCESSOR ai
+    class WEB_APP,WHATSAPP user
+    class GITHUB,DOCKER_HUB cicd
+    class CONVERSATIONS,MESSAGES,TRANSACTIONS,GOALS,USER_PROFILES,KNOWLEDGE_BASE,AGENT_CACHE db
