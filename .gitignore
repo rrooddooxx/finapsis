@@ -8,8 +8,11 @@ yarn-error.log*
 /.pnp
 .pnp.js
 
+.idea
+**/.idea
+**/.vscode/*
 .vscode/*
 .idea/*
-.qodo/*
+**/.qodo/*
 .DS_Store
 **/.DS_Store
