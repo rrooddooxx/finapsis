@@ -80,6 +80,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    environment: production  # This specifies which GitHub environment to use
 
     steps:
       - name: Checkout code
@@ -143,6 +144,7 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    environment: production  # This specifies which GitHub environment to use
 
     steps:
       - name: Health Check
