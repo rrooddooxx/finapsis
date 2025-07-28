@@ -38,10 +38,10 @@ Proyecto para hackathon de Desafío Latam x Equipo Finapsis.
 ## 📁 Estructura del Proyecto
 
 ```
-financial-assistant/
 ├── apps/
 │   ├── api/          # Backend Hono
-│   └── web/          # Frontend React
+│   ├── web/          # Frontend React
+│   └── workers/          # Workers BullMQ
 ├── packages/
 │   ├── shared/       # Tipos compartidos + provider IA
 │   └── supabase/     # Cliente y migraciones
