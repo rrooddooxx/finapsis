@@ -1,13 +1,13 @@
 name: Install Docker On VM
-
 on:
   push:
     branches:
       - install-docker-vm
 jobs:
-  deploy:
+  install:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/install-docker-vm'
+    environment: prod
 
     steps:
       - name: Install Docker on Oracle Cloud VM
