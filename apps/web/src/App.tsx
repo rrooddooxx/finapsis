@@ -1,34 +1,54 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
+  const [apiStatus, setApiStatus] = useState<string>('Checking...')
   const [count, setCount] = useState(0)
 
+  useEffect(() => {
+    // Check API connectivity
+    fetch('/api/status')
+      .then(res => res.json())
+      .then(data => {
+        setApiStatus(`API: ${data.status} (${data.environment})`)
+      })
+      .catch(() => {
+        setApiStatus('API: Disconnected')
+      })
+  }, [])
+
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="App">
+      <header className="App-header">
+        <h1>🏦 Financial Assistant</h1>
+        <p>Personal AI-powered financial coach</p>
+        
+        <div className="status-card">
+          <h3>System Status</h3>
+          <p>Frontend: ✅ Running</p>
+          <p>{apiStatus}</p>
+        </div>
+
+        <div className="card">
+          <button onClick={() => setCount((count) => count + 1)}>
+            Test Counter: {count}
+          </button>
+          <p>
+            Ready for deployment testing!
+          </p>
+        </div>
+
+        <div className="features">
+          <h3>Coming Soon:</h3>
+          <ul>
+            <li>📱 WhatsApp Integration</li>
+            <li>🤖 AI-Powered Chat</li>
+            <li>📊 Financial Insights</li>
+            <li>🎯 Goal Tracking</li>
+          </ul>
+        </div>
+      </header>
+    </div>
   )
 }
 

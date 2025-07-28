@@ -1,14 +1,14 @@
 graph LR
-    subgraph "1. User Layer"
+    subgraph "1 - User Layer"
         WEB_APP[React Web App<br/>Browser]
         WHATSAPP[WhatsApp<br/>Users]
     end
 
-    subgraph "2. Entry Points"
+    subgraph "2 - Entry Points"
         TWILIO[Twilio API<br/>WhatsApp Business]
     end
 
-    subgraph "3. Oracle Cloud VM"
+    subgraph "3 - Oracle Cloud VM"
         subgraph "Docker Containers"
             NGINX[Nginx<br/>:80<br/>Serve React Build]
             HONO[Hono API Server<br/>:3000<br/>TypeScript/Bun]
@@ -17,7 +17,7 @@ graph LR
         end
     end
 
-    subgraph "4. Core Services"
+    subgraph "4 - Core Services"
         subgraph "AI Processing Flow"
             CHAT_SERVICE[Chat Service<br/>Handles User Messages]
             AGENT_ORCHESTRATOR[Agent Orchestrator<br/>Decides Which Agents]
@@ -26,21 +26,21 @@ graph LR
         end
     end
 
-    subgraph "5. AI Agents"
+    subgraph "5 - AI Agents"
         BALANCE_AGENT[Balance Agent<br/>Returns: balance data]
         BUDGET_AGENT[Budget Agent<br/>Returns: budget analysis]
         GOAL_AGENT[Goal Planner<br/>Returns: savings plan]
         DEBT_AGENT[Debt Analyzer<br/>Returns: debt status]
     end
 
-    subgraph "6. Background Jobs"
+    subgraph "6 - Background Jobs"
         MSG_PROCESSOR[Message Processor]
         RECEIPT_OCR[Receipt Extractor]
         VIDEO_SCRAPER[Video Scraper]
         TRANSACTION_ANALYZER[Transaction Analyzer]
     end
 
-    subgraph "7. Oracle Cloud Services"
+    subgraph "7 - Oracle Cloud Services"
         OCI_STORAGE[OCI Object Storage<br/>User Uploads<br/>Receipts/Images]
 
         subgraph "OCI Generative AI"
@@ -52,7 +52,7 @@ graph LR
         OCI_SPEECH[OCI Speech<br/>Transcription<br/>for Voice Notes]
     end
 
-    subgraph "8. External Services"
+    subgraph "8 - External Services"
         subgraph "Supabase Cloud"
             SUPABASE_AUTH[Supabase Auth<br/>Phone/OTP]
 
@@ -78,7 +78,7 @@ graph LR
         end
     end
 
-    subgraph "9. CI/CD"
+    subgraph "9 - CI/CD"
         GITHUB[GitHub Actions]
         DOCKER_HUB[Docker Hub<br/>Registry]
     end
@@ -90,34 +90,34 @@ graph LR
     TWILIO -->|Webhook| HONO
 
 %% API to Chat Service
-    HONO -->|1. User Message| CHAT_SERVICE
+    HONO -->|1 - User Message| CHAT_SERVICE
 
 %% Chat Service Flow (numbered for clarity)
-    CHAT_SERVICE -->|2. Analyze Intent| AGENT_ORCHESTRATOR
-    CHAT_SERVICE -->|6. Get Context| RAG_PIPELINE
-    CHAT_SERVICE -->|7. Generate Response| LLM_PROCESSOR
+    CHAT_SERVICE -->|2 - Analyze Intent| AGENT_ORCHESTRATOR
+    CHAT_SERVICE -->|6 - Get Context| RAG_PIPELINE
+    CHAT_SERVICE -->|7 - Generate Response| LLM_PROCESSOR
 
 %% Agent Orchestrator Flow
-    AGENT_ORCHESTRATOR -->|3. Call Agents| BALANCE_AGENT
-    AGENT_ORCHESTRATOR -->|3. Call Agents| BUDGET_AGENT
-    AGENT_ORCHESTRATOR -->|3. Call Agents| GOAL_AGENT
-    AGENT_ORCHESTRATOR -->|3. Call Agents| DEBT_AGENT
+    AGENT_ORCHESTRATOR -->|3 - Call Agents| BALANCE_AGENT
+    AGENT_ORCHESTRATOR -->|3 - Call Agents| BUDGET_AGENT
+    AGENT_ORCHESTRATOR -->|3 - Call Agents| GOAL_AGENT
+    AGENT_ORCHESTRATOR -->|3 - Call Agents| DEBT_AGENT
 
 %% Agents Return Data
-    BALANCE_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
-    BUDGET_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
-    GOAL_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
-    DEBT_AGENT -->|4. Return Data| AGENT_ORCHESTRATOR
+    BALANCE_AGENT -->|4 -. Return Data| AGENT_ORCHESTRATOR
+    BUDGET_AGENT -->|4 - Return Data| AGENT_ORCHESTRATOR
+    GOAL_AGENT -->|4 - Return Data| AGENT_ORCHESTRATOR
+    DEBT_AGENT -->|4 - Return Data| AGENT_ORCHESTRATOR
 
 %% Orchestrator Returns to Chat Service
-    AGENT_ORCHESTRATOR -->|5. Agent Results| CHAT_SERVICE
+    AGENT_ORCHESTRATOR -->|5 - Agent Results| CHAT_SERVICE
 
 %% LLM Processing - Now using OCI
-    LLM_PROCESSOR -->|8. Call LLM| OCI_LLM
-    LLM_PROCESSOR -->|9. Final Response| CHAT_SERVICE
+    LLM_PROCESSOR -->|8 - Call LLM| OCI_LLM
+    LLM_PROCESSOR -->|9 - Final Response| CHAT_SERVICE
 
 %% Chat Service Returns Response
-    CHAT_SERVICE -->|10. Stream Response| HONO
+    CHAT_SERVICE -->|10 - Stream Response| HONO
 
 %% Database Interactions
     CHAT_SERVICE --> MESSAGES

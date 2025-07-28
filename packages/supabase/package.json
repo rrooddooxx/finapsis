@@ -1,0 +1,22 @@
+{
+  "name": "@finapsis/supabase",
+  "version": "1.0.0",
+  "description": "Supabase client and database utilities for Financial Assistant",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo 'Testing supabase...' && exit 0",
+    "lint": "echo 'Linting supabase...' && exit 0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "@financial-assistant/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

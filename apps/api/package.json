@@ -1,12 +1,19 @@
 {
-  "name": "api",
+  "name": "@finapsis/api",
+  "version": "1.0.0",
+  "description": "Finapsis Backend API",
   "scripts": {
-    "dev": "bun run --hot src/index.ts"
+    "dev": "bun run --hot src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "start": "bun run dist/index.js",
+    "test": "bun test",
+    "lint": "echo 'Linting API...' && exit 0"
   },
   "dependencies": {
     "hono": "^4.8.9"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.3.3"
   }
 }

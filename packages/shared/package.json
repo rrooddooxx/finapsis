@@ -1,0 +1,33 @@
+{
+  "name": "@finapsis/shared",
+  "version": "1.0.0",
+  "description": "Shared types, utilities, and providers for Financial Assistant",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./providers/oci": {
+      "import": "./dist/providers/oci/index.js",
+      "types": "./dist/providers/oci/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo 'Testing shared...' && exit 0",
+    "lint": "echo 'Linting shared...' && exit 0"
+  },
+  "dependencies": {
+    "@ai-sdk/provider": "^0.0.12",
+    "oci-sdk": "^2.73.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

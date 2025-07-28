@@ -2,7 +2,8 @@
 
 ## Project Overview
 
-A personal financial coach/assistant that allows users to input financial data via WhatsApp (receipts, voice notes, natural language) and provides AI-powered financial coaching through a web interface. Built for a one-week hackathon by a team of 3 engineers.
+A personal financial coach/assistant that allows users to input financial data via WhatsApp 
+(receipts, voice notes, natural language) and provides AI-powered financial coaching through a web interface. Built for a one-week hackathon.
 
 **Core Features:**
 - WhatsApp integration for easy financial data input (text, images, voice)

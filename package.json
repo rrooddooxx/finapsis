@@ -1,14 +1,34 @@
 {
-  "name": "hackathon_finapsis",
+  "name": "finapsis",
+  "private": true,
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/index.js",
+  "description": "Personal financial coach/assistant with WhatsApp integration and AI-powered coaching",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "build": "tsc"
+    "dev": "bun run --parallel dev:api dev:web",
+    "dev:api": "bun --cwd apps/api run dev",
+    "dev:web": "bun --cwd apps/web run dev",
+    "build": "bun run build:shared && bun run --parallel build:api build:web",
+    "build:api": "bun --cwd apps/api run build",
+    "build:web": "bun --cwd apps/web run build",
+    "build:shared": "bun --cwd packages/shared run build",
+    "test": "bun test",
+    "test:api": "bun --cwd apps/api run test",
+    "test:web": "bun --cwd apps/web run test",
+    "lint": "bun run --parallel lint:api lint:web",
+    "lint:api": "bun --cwd apps/api run lint",
+    "lint:web": "bun --cwd apps/web run lint",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.5.3"
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
   },
-  "private": true
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  }
 }

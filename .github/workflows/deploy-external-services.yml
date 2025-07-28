@@ -1,0 +1,159 @@
+name: Deploy to Oracle Cloud
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME_API: ${{ secrets.DOCKERHUB_USERNAME }}/financial-assistant-api
+  IMAGE_NAME_WEB: ${{ secrets.DOCKERHUB_USERNAME }}/financial-assistant-web
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run tests
+        run: |
+          bun run test:api
+          bun run test:web
+
+      - name: Lint code
+        run: |
+          bun run lint:api
+          bun run lint:web
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_NAME_API }}:latest,${{ env.IMAGE_NAME_API }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_NAME_WEB }}:latest,${{ env.IMAGE_NAME_WEB }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Oracle Cloud
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: opc
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            
+            # Create app directory if it doesn't exist
+            mkdir -p /home/ubuntu/financial-assistant
+            cd /home/ubuntu/financial-assistant
+
+            # Create environment file
+            cat > .env << EOF
+            REGISTRY=docker.io
+            IMAGE_NAME_API=${{ env.IMAGE_NAME_API }}
+            IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
+            TAG=latest
+            
+            # Supabase
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+            
+            # Oracle Cloud
+            OCI_TENANCY_ID=${{ secrets.OCI_TENANCY_ID }}
+            OCI_USER_ID=${{ secrets.OCI_USER_ID }}
+            OCI_FINGERPRINT=${{ secrets.OCI_FINGERPRINT }}
+            OCI_PRIVATE_KEY_PATH=${{ secrets.OCI_PRIVATE_KEY_PATH }}
+            OCI_REGION=${{ secrets.OCI_REGION }}
+            OCI_COMPARTMENT_ID=${{ secrets.OCI_COMPARTMENT_ID }}
+            EOF
+
+            # Download docker-compose.prod.yml
+            curl -o docker-compose.prod.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.prod.yml
+
+            # Pull latest images
+            docker-compose -f docker-compose.prod.yml pull
+
+            # Stop existing containers
+            docker-compose -f docker-compose.prod.yml down
+
+            # Start new containers
+            docker-compose -f docker-compose.prod.yml up -d
+
+            # Clean up old images
+            docker image prune -f
+
+            # Health check
+            sleep 30
+            curl -f http://localhost/health || exit 1
+            
+            echo "Deployment successful!"
+
+  health-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Health Check
+        run: |
+          echo "Waiting for services to be ready..."
+          sleep 60
+          
+          # Check if the service is responding
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.OCI_HOST }}/health || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Health check passed! Service is running."
+          else
+            echo "❌ Health check failed! HTTP status: $response"
+            exit 1
+          fi

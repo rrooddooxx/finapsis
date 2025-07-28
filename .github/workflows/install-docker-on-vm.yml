@@ -1,0 +1,60 @@
+name: Deploy to Oracle Cloud
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME_API: ${{ secrets.DOCKERHUB_USERNAME }}/financial-assistant-api
+  IMAGE_NAME_WEB: ${{ secrets.DOCKERHUB_USERNAME }}/financial-assistant-web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Install Docker on Oracle Cloud VM
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: opc
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            
+            #Install docker & docker compose
+            sudo dnf update -y
+            sudo dnf -y install dnf-plugins-core curl
+            sudo dnf-3 config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+            sudo dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+            sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            sudo systemctl enable --now docker
+            sudo systemctl status docker --no-pager
+            sudo usermod -aG docker $USER
+            newgrp docker
+            
+            echo "Install successful!"
+
+  health-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Health Check
+        run: |
+          echo "Waiting for services to be ready..."
+          sleep 60
+          
+          # Check if the service is responding
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.OCI_HOST }}/health || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Health check passed! Service is running."
+          else
+            echo "❌ Health check failed! HTTP status: $response"
+            exit 1
+          fi

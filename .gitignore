@@ -16,3 +16,7 @@ yarn-error.log*
 **/.qodo/*
 .DS_Store
 **/.DS_Store
+
+
+analyze the requirements on @CLAUDE.md and @apps/api/CLAUDE.md and @apps/web/CLAUDE.md and make a
+ plan to implement the first boilerplate structure, so I can have the most basic service, to test a github action to deploy a very basic service to oracle cloud, and then we will keep working until reach the final app for the project
