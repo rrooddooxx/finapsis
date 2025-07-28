@@ -10,8 +10,8 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME_API: ${{ secrets.DOCKERHUB_USERNAME }}/financial-assistant-api
-  IMAGE_NAME_WEB: ${{ secrets.DOCKERHUB_USERNAME }}/financial-assistant-web
+  IMAGE_NAME_API: ${{ secrets.DOCKERHUB_USERNAME }}/finapsis-backend
+  IMAGE_NAME_WEB: ${{ secrets.DOCKERHUB_USERNAME }}/finapsis-web
 
 jobs:
   test:
@@ -80,7 +80,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    environment: production  # This specifies which GitHub environment to use
+    environment: prod
 
     steps:
       - name: Checkout code
@@ -144,7 +144,7 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    environment: production  # This specifies which GitHub environment to use
+    environment: production
 
     steps:
       - name: Health Check
