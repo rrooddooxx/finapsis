@@ -1,13 +1,12 @@
-# README.md
-
-# 💰 Asistente Financiero Personal
+# 💸 Finapsis 💸
 
 Un chatbot financiero inteligente que te ayuda a manejar tus lucas de forma simple y visual.
-Proyecto para hackathon de una semana.
+Proyecto para hackathon de Desafío Latam x Equipo Finapsis.
 
 ## 🚀 ¿Qué hace?
 
-- **Chat con IA**: Pregúntale sobre tus finanzas y te responde con gráficos y tarjetas interactivas
+- **Chatbot con IA**: Pregúntale sobre tus finanzas y te responde con gráficos y tarjetas
+  interactivas
 - **WhatsApp**: Mándale fotos de boletas, mensajes de voz o texto y los procesa automáticamente
 - **Sincronización en tiempo real**: Lo que mandas por WhatsApp aparece al tiro en la web
 - **Análisis inteligente**: Te dice en qué gastaste más, cómo ahorrar y te ayuda con tus metas
