@@ -1,177 +1,180 @@
-# 🏦 Financial Assistant
+# README.md
 
-A personal financial coach/assistant that allows users to input financial data via WhatsApp and provides AI-powered financial coaching through a web interface.
+# 💰 Asistente Financiero Personal
 
-## 🚀 Quick Start
+Un chatbot financiero inteligente que te ayuda a manejar tus lucas de forma simple y visual.
+Proyecto para hackathon de una semana.
 
-### Prerequisites
-- [Bun](https://bun.sh/) >= 1.0.0
-- [Docker](https://docker.com/) and Docker Compose
-- [Node.js](https://nodejs.org/) >= 18.0.0
+## 🚀 ¿Qué hace?
 
-### Local Development
+- **Chat con IA**: Pregúntale sobre tus finanzas y te responde con gráficos y tarjetas interactivas
+- **WhatsApp**: Mándale fotos de boletas, mensajes de voz o texto y los procesa automáticamente
+- **Sincronización en tiempo real**: Lo que mandas por WhatsApp aparece al tiro en la web
+- **Análisis inteligente**: Te dice en qué gastaste más, cómo ahorrar y te ayuda con tus metas
 
-1. **Clone and install dependencies:**
-   ```bash
-   git clone <repository-url>
-   cd financial-assistant
-   bun install
-   ```
+## 🛠 Stack Técnico
 
-2. **Set up environment variables:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your actual values
-   ```
+### Backend
 
-3. **Start development services:**
-   ```bash
-   # Start all services
-   bun run dev
+- **Runtime**: Bun (más rápido que Node.js)
+- **Framework**: Hono (minimalista y rápido)
+- **IA**: Oracle Cloud AI + Vercel AI SDK
+- **Base de datos**: Supabase (PostgreSQL + auth + realtime)
+- **Cola de tareas**: BullMQ + Redis
+- **WhatsApp**: Twilio
 
-   # Or start individually
-   bun run dev:api    # Backend API on :3000
-   bun run dev:web    # Frontend on :5173
-   ```
+### Frontend
 
-4. **Using Docker (recommended for production-like testing):**
-   ```bash
-   docker-compose up -d
-   ```
+- **Build**: Vite + React + TypeScript
+- **UI**: Tailwind CSS + Shadcn/ui
+- **Estado**: Zustand + TanStack Query
+- **Chat**: Vercel AI SDK con Generative UI
 
-## 🏗️ Project Structure
+### Infraestructura
+
+- **Cloud**: Oracle Cloud (VM + Object Storage)
+- **Deploy**: Docker + GitHub Actions
+- **Monorepo**: Bun workspaces
+
+## 📁 Estructura del Proyecto
 
 ```
 financial-assistant/
 ├── apps/
-│   ├── api/                 # Hono backend (TypeScript + Bun)
-│   └── web/                 # React frontend (Vite + TypeScript)
+│   ├── api/          # Backend Hono
+│   └── web/          # Frontend React
 ├── packages/
-│   ├── shared/              # Shared types and utilities
-│   └── supabase/            # Database client and types
-├── .github/workflows/       # GitHub Actions for CI/CD
-├── docker-compose.yml       # Development containers
-└── docker-compose.prod.yml  # Production containers
+│   ├── shared/       # Tipos compartidos + provider IA
+│   └── supabase/     # Cliente y migraciones
+└── docker-compose.yml
 ```
 
-## 🔧 Available Scripts
+## 🏃‍♂️ Cómo correr el proyecto
 
-### Root Level
-- `bun run dev` - Start both API and web in development mode
-- `bun run build` - Build all packages for production
-- `bun run test` - Run all tests
-- `bun run lint` - Lint all packages
+### Prerrequisitos
 
-### API (apps/api)
-- `bun run dev` - Start development server with hot reload
-- `bun run build` - Build for production
-- `bun run start` - Start production server
+- Bun instalado (`curl -fsSL https://bun.sh/install | bash`)
+- Docker para Redis local
+- Cuenta en Supabase
+- Créditos de Oracle Cloud (para IA)
 
-### Web (apps/web)
-- `bun run dev` - Start Vite development server
-- `bun run build` - Build for production
-- `bun run preview` - Preview production build
+### Setup inicial
 
-## 🚢 Deployment
-
-### GitHub Actions
-The project includes automated deployment to Oracle Cloud via GitHub Actions:
-
-1. **Set up repository secrets:**
-   - `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
-   - `OCI_HOST`, `OCI_SSH_KEY`
-   - All environment variables from `.env.example`
-
-2. **Deploy:**
-   ```bash
-   git push origin main
-   ```
-
-### Manual Deployment
 ```bash
-# Build and push images
-docker-compose -f docker-compose.prod.yml build
-docker-compose -f docker-compose.prod.yml push
+# Clonar el repo
+git clone [repo-url]
+cd financial-assistant
 
-# Deploy on server
-docker-compose -f docker-compose.prod.yml up -d
+# Instalar dependencias
+bun install
+
+# Copiar variables de entorno
+cp .env.example .env.local
+# Llenar con tus claves de Supabase, Oracle, Twilio
+
+# Levantar servicios locales
+docker-compose up -d
+
+# Correr migraciones
+bun run db:migrate
+
+# Iniciar desarrollo
+bun run dev
 ```
 
-## 🏛️ Architecture
+Esto levanta:
 
-### Backend (Hono + Bun)
-- **Framework:** Hono (lightweight, fast)
-- **Runtime:** Bun (JavaScript/TypeScript runtime)
-- **Database:** Supabase (PostgreSQL + pgvector)
-- **AI:** Oracle Cloud Generative AI (custom provider)
-- **Queue:** BullMQ + Redis
-- **Auth:** Supabase Auth
+- Backend en http://localhost:3000
+- Frontend en http://localhost:5173
 
-### Frontend (React + Vite)
-- **Framework:** React 18 + TypeScript
-- **Build Tool:** Vite with SWC
-- **Styling:** Tailwind CSS + Shadcn/ui
-- **State:** Zustand + TanStack Query
-- **AI Integration:** Vercel AI SDK + Generative UI
+## 🔑 Variables de Entorno Necesarias
 
-### Key Features (Planned)
-- 📱 WhatsApp integration via Twilio
-- 🤖 AI-powered financial coaching
-- 📊 Real-time financial insights
-- 🎯 Goal tracking and budgeting
-- 📄 Receipt OCR processing
-- 🔄 Real-time sync between platforms
+```env
+# Supabase
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_KEY=
 
-## 🛠️ Development Workflow
+# Oracle Cloud (para IA)
+OCI_COMPARTMENT_ID=
+OCI_REGION=
 
-### Day 1: Infrastructure ✅
-- [x] Basic project structure
-- [x] Hono API with health endpoints
-- [x] React web app with API connectivity
-- [x] Docker configuration
-- [x] GitHub Actions deployment
+# Twilio (para WhatsApp)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+```
 
-### Day 2-3: Core Features (Next)
-- [ ] OCI Provider for Vercel AI SDK
-- [ ] Supabase database setup
-- [ ] Basic authentication
-- [ ] Chat interface with streaming
+## 🏗 Arquitectura Simplificada
 
-### Day 4-5: Advanced Features
-- [ ] WhatsApp integration
-- [ ] Financial agents (balance, budget, goals)
-- [ ] Receipt processing with OCR
+```
+Usuario (Web/WhatsApp)
+         ↓
+    Hono API (:3000)
+         ↓
+   ┌─────┴─────┐
+   │           │
+Chat Service   Workers (BullMQ)
+   │           │
+   └─────┬─────┘
+         ↓
+  Oracle Cloud AI
+    + Supabase
+```
 
-### Day 6-7: Polish & Deploy
-- [ ] RAG pipeline for financial knowledge
-- [ ] UI improvements and testing
-- [ ] Production deployment and demo
+### Flujo del Chat
 
-## 🔍 API Endpoints
+1. **Usuario escribe**: "¿Cuánto gasté en comida?"
+2. **Chat Service** procesa el mensaje
+3. **Agent Orchestrator** decide qué agentes usar
+4. **Balance Agent** consulta las transacciones
+5. **LLM** genera respuesta con los datos
+6. **Frontend** renderiza una tarjeta visual con el resultado
 
-### Health & Status
-- `GET /health` - Service health check
-- `GET /api/status` - API status and environment info
+### Flujo de WhatsApp
 
-### Coming Soon
-- `POST /api/chat/stream` - Streaming chat with AI
-- `GET /api/transactions` - User transactions
-- `POST /webhooks/twilio` - WhatsApp webhook handler
+1. **Usuario manda foto** de boleta por WhatsApp
+2. **Twilio** manda webhook a nuestra API
+3. **API** encola el trabajo en Redis
+4. **Worker** procesa la imagen con OCR
+5. **Worker** guarda la transacción
+6. **Worker** responde por WhatsApp
+7. **Web app** se actualiza en tiempo real
 
-## 🤝 Contributing
+## 🎯 Decisiones Técnicas Clave
 
-1. Create feature branch from `main`
-2. Make changes with tests
-3. Submit PR for review
-4. Deploy automatically on merge to `main`
+- **Monolito modular**: Todo en un servidor Hono (excepto workers) para simplificar
+- **Generative UI**: Las respuestas del chat incluyen componentes React interactivos
+- **Provider customizado**: Creamos un provider para Oracle AI compatible con Vercel AI SDK
+- **Workers asincrónicos**: Procesamiento pesado (OCR, transcripción) no bloquea la API
+- **Supabase todo-en-uno**: Auth + DB + Storage + Realtime en un solo servicio
 
-## 📝 License
+## 🚢 Deploy
 
-This project is built for the hackathon and is currently private.
+El proyecto se deploya automáticamente a Oracle Cloud cuando pusheas a `main`:
 
-## 🆘 Support
+```bash
+git push origin main
+```
 
-For development questions, check:
-- Backend implementation: `apps/api/CLAUDE.md`
-- Frontend implementation: `apps/web/CLAUDE.md`
-- Architecture overview: `CLAUDE.md`
+GitHub Actions se encarga de:
+
+1. Buildear las imágenes Docker
+2. Subirlas a Docker Hub
+3. Conectarse por SSH al servidor
+4. Actualizar los contenedores
+
+## 💡 Tips para el Hackathon
+
+- **Prioridad 1**: Que el chat funcione con respuestas visuales (Generative UI)
+- **Prioridad 2**: Integración WhatsApp básica
+- **Prioridad 3**: Agentes financieros que impresionen
+- **Nice to have**: RAG con videos de influencers
+
+## 🤝 Equipo
+
+Proyecto desarrollado por equipo FINAPSIS.
+
+---
+
+Cualquier duda, revisa los archivos `CLAUDE.md` en cada carpeta para más detalles técnicos. ¡Dale
+con todo! 🚀
