@@ -1,13 +1,13 @@
 name: Install Docker On VM
-
 on:
   push:
     branches:
       - install-docker-vm
 jobs:
-  deploy:
+  install:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/install-docker-vm'
+    environment: prod
 
     steps:
       - name: Install Docker on Oracle Cloud VM
@@ -30,24 +30,3 @@ jobs:
             newgrp docker
             
             echo "Install successful!"
-
-  health-check:
-    needs: deploy
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Health Check
-        run: |
-          echo "Waiting for services to be ready..."
-          sleep 60
-          
-          # Check if the service is responding
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.OCI_HOST }}/health || echo "000")
-          
-          if [ "$response" = "200" ]; then
-            echo "✅ Health check passed! Service is running."
-          else
-            echo "❌ Health check failed! HTTP status: $response"
-            exit 1
-          fi
