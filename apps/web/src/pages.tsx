@@ -473,16 +473,3 @@ export default function OnboardingFlow() {
     </div>
   )
 }
-// Add a tsconfig.json file to your project with JSX configuration
-{
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "esModuleInterop": true,
-    "lib": ["DOM", "DOM.Iterable", "ESNext"],
-    "module": "ESNext",
-    "target": "ESNext",
-    "moduleResolution": "node",
-    "strict": true
-  },
-  "include": ["src/**/*"]
-}
