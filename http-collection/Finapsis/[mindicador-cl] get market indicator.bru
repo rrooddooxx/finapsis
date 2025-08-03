@@ -1,0 +1,19 @@
+meta {
+  name: [mindicador-cl] get market indicator
+  type: http
+  seq: 4
+}
+
+get {
+  url: https://mindicador.cl/api/:indicator
+  body: none
+  auth: inherit
+}
+
+params:path {
+  indicator: ipc
+}
+
+settings {
+  encodeUrl: true
+}

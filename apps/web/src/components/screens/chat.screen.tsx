@@ -7,21 +7,28 @@ import {Badge} from "../ui/badge.tsx"
 import {ScrollArea} from "../ui/scroll-area.tsx"
 import {Separator} from "../ui/separator.tsx"
 import {Avatar, AvatarFallback} from "../ui/avatar.tsx"
-import type {ChatMessageRequest, Message, OnboardingData, ScreenProps} from "@/types"
-import {ChatService} from "@/services/chat.service.ts"
+import type {OnboardingData, ScreenProps} from "@/types"
+import {useChat} from "@ai-sdk/react"
+import {DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls} from "ai"
 
 interface ChatScreenProps extends ScreenProps {
     onboardingData?: OnboardingData
-    initialMessages?: Message[]
 }
 
-export function ChatScreen({onStateChange, onboardingData, initialMessages = []}: ChatScreenProps) {
-    const [messages, setMessages] = useState<Message[]>(initialMessages)
-    const [newMessage, setNewMessage] = useState("")
-    const [isLoading, setIsLoading] = useState(false)
+export function ChatScreen({onStateChange, onboardingData}: ChatScreenProps) {
+    const [input, setInput] = useState("")
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
-    // Auto scroll to bottom when messages change
+    console.log(import.meta.env.BACKEND_API_URL)
+
+    const {messages, sendMessage, status} = useChat({
+        transport: new DefaultChatTransport({
+            api: `${import.meta.env.BACKEND_API_URL || 'http://localhost:3000'}/api/chat/ui`,
+        }),
+        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls
+    })
+
+
     const scrollToBottom = () => {
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({
@@ -31,83 +38,18 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
         }
     }
 
-    // Scroll to bottom when messages update
     useEffect(() => {
         scrollToBottom()
-    }, [messages, isLoading])
+    }, [messages, status])
 
-    const handleSendMessage = async () => {
-        if (!newMessage.trim()) return
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!input.trim() || status !== 'ready') return
 
-        const userMessage: Message = {
-            id: messages.length + 1,
-            text: newMessage,
-            sender: "user",
-            timestamp: new Date(),
-            type: "text",
-        }
+        const currentMessage = input
+        setInput("")
 
-        setMessages((prev) => [...prev, userMessage])
-        const currentMessage = newMessage
-        setNewMessage("")
-        setIsLoading(true)
-
-        try {
-            // Create the request object
-            const messageRequest: ChatMessageRequest = {
-                message: currentMessage
-            }
-
-            // Send message to backend and get streaming response
-            const stream = await ChatService.sendMessage(messageRequest)
-            const reader = stream.getReader()
-            const decoder = new TextDecoder()
-
-            // Create initial bot message
-            const botMessage: Message = {
-                id: messages.length + 2,
-                text: "",
-                sender: "bot",
-                timestamp: new Date(),
-                type: "text",
-            }
-
-            setMessages((prev) => [...prev, botMessage])
-            setIsLoading(false)
-
-            // Read streaming response
-            let accumulated = ""
-            while (true) {
-                const {done, value} = await reader.read()
-                if (done) break
-
-                const chunk = decoder.decode(value, {stream: true})
-                accumulated += chunk
-
-                // Update the bot message with accumulated text
-                setMessages((prev) =>
-                    prev.map((msg) =>
-                        msg.id === botMessage.id
-                            ? {...msg, text: accumulated}
-                            : msg
-                    )
-                )
-            }
-        } catch (error) {
-            console.error("Error sending message:", error)
-
-            // Show error message
-            const errorMessage: Message = {
-                id: messages.length + 2,
-                text: "Lo siento, hubo un error al enviar tu mensaje. Por favor, inténtalo de nuevo.",
-                sender: "bot",
-                timestamp: new Date(),
-                type: "text",
-            }
-
-            setMessages((prev) => [...prev, errorMessage])
-            setIsLoading(false)
-        }
+        await sendMessage({text: currentMessage})
     }
 
     const handleReset = () => {
@@ -145,57 +87,64 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
 
                     <ScrollArea className="flex-1 p-4 sm:p-6">
                         <div className="space-y-4">
-                            {messages.map((message) => (
-                                <div key={message.id}
-                                     className={`flex gap-3 ${message.sender === "user" ? "flex-row-reverse" : ""}`}>
-                                    <Avatar className="h-8 w-8 flex-shrink-0 shadow-sm">
-                                        <AvatarFallback
-                                            className={
-                                                message.sender === "user"
-                                                    ? "bg-primary text-primary-foreground"
-                                                    : "bg-muted text-muted-foreground"
-                                            }
-                                        >
-                                            {message.sender === "user" ?
-                                                <User className="h-4 w-4"/> :
-                                                <Bot className="h-4 w-4"/>}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div
-                                        className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${message.sender === "user" ? "items-end" : "items-start"}`}>
-                                        {/* Text content */}
-                                        {message.text && (
+                            {messages.map((message) => {
+                                if (message.role === "assistant" &&
+                                    (!message.parts || message.parts.length === 0 ||
+                                        !message.parts.some(part => part.type === 'text' && part.text && part.text.trim().length > 0))) {
+                                    return null
+                                }
+
+                                return (
+                                    <div key={message.id}
+                                         className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+                                        <Avatar className="h-8 w-8 flex-shrink-0 shadow-sm">
+                                            <AvatarFallback
+                                                className={
+                                                    message.role === "user"
+                                                        ? "bg-primary text-primary-foreground"
+                                                        : "bg-muted text-muted-foreground"
+                                                }
+                                            >
+                                                {message.role === "user" ?
+                                                    <User className="h-4 w-4"/> :
+                                                    <Bot className="h-4 w-4"/>}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div
+                                            className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${message.role === "user" ? "items-end" : "items-start"}`}>
                                             <div
                                                 className={`px-3 py-2 sm:px-4 sm:py-3 rounded-2xl text-sm sm:text-base shadow-sm ${
-                                                    message.sender === "user"
+                                                    message.role === "user"
                                                         ? "bg-primary text-primary-foreground rounded-br-md"
                                                         : "bg-muted text-muted-foreground rounded-bl-md"
                                                 }`}
                                             >
-                                                <p className="leading-relaxed">{message.text}</p>
+                                                <p className="leading-relaxed">
+                                                    {message.parts?.map((part, index) =>
+                                                        part.type === 'text' ? <span
+                                                            key={index}>{part.text}</span> : null
+                                                    )}
+                                                </p>
                                             </div>
-                                        )}
 
-                                        {/* Component content */}
-                                        {message.component && (
-                                            <div
-                                                className={`mt-2 ${message.text ? "mt-2" : ""} w-full max-w-none`}>
-                                                {message.component}
-                                            </div>
-                                        )}
-
-                                        <span className="text-xs text-muted-foreground mt-1 px-1">
-                      {message.timestamp.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                      })}
-                    </span>
+                                            <span
+                                                className="text-xs text-muted-foreground mt-1 px-1">
+                                                {new Date(Date.now()).toLocaleTimeString([], {
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
 
-                            {/* Loading indicator */}
-                            {isLoading && (
+                            {(status === 'submitted' || (status === 'streaming' &&
+                                messages.length > 0 &&
+                                messages[messages.length - 1]?.role === 'assistant' &&
+                                !messages[messages.length - 1]?.parts?.some(part =>
+                                    part.type === 'text' && part.text && part.text.trim().length > 0
+                                ))) && (
                                 <div className="flex gap-3">
                                     <Avatar className="h-8 w-8 flex-shrink-0 shadow-sm">
                                         <AvatarFallback className="bg-muted text-muted-foreground">
@@ -213,8 +162,6 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
                                     </div>
                                 </div>
                             )}
-
-                            {/* Scroll anchor - invisible element to scroll to */}
                             <div ref={messagesEndRef}/>
                         </div>
                     </ScrollArea>
@@ -222,24 +169,23 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
                     <Separator className="bg-border"/>
 
                     <CardContent className="p-4 sm:p-6 bg-card/50">
-                        <div className="flex gap-2 sm:gap-3">
+                        <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3">
                             <Input
-                                value={newMessage}
-                                onChange={(e) => setNewMessage(e.target.value)}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
                                 placeholder="Escribe tu mensaje..."
-                                onKeyPress={(e) => e.key === "Enter" && !isLoading && handleSendMessage()}
-                                disabled={isLoading}
+                                disabled={status !== 'ready'}
                                 className="flex-1 min-h-[44px] text-base bg-background border-input focus:border-ring focus:ring-ring"
                             />
                             <Button
-                                onClick={handleSendMessage}
-                                disabled={isLoading || !newMessage.trim()}
+                                type="submit"
+                                disabled={status !== 'ready' || !input.trim()}
                                 size="icon"
                                 className="h-[44px] w-[44px] flex-shrink-0 shadow-md hover:shadow-lg transition-all duration-200"
                             >
                                 <Send className="h-4 w-4"/>
                             </Button>
-                        </div>
+                        </form>
                         <div className="flex justify-center mt-4">
                             <Button
                                 onClick={handleReset}

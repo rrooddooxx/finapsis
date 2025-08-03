@@ -28,10 +28,8 @@ function App() {
     const handleLogin = async (loginData: LoginData) => {
         setIsLoading(true)
 
-        // Simulate authentication
         await new Promise((resolve) => setTimeout(resolve, 1500))
 
-        // Simple validation for demo
         if (loginData.email && loginData.password.length >= 6) {
             setAppState("chat")
             const loginWelcomeMessage: Message = {
@@ -63,7 +61,6 @@ function App() {
     const handleStateChange = (state: AppState) => {
         setAppState(state)
 
-        // Reset data when going back to welcome
         if (state === "welcome") {
             setOnboardingData({name: "", goal: "", experience: ""})
             setMessages([
@@ -78,7 +75,6 @@ function App() {
         }
     }
 
-    // Render screens based on current state
     switch (appState) {
         case "welcome":
             return <WelcomeScreen onStateChange={handleStateChange}/>
@@ -105,7 +101,6 @@ function App() {
                 <ChatScreen
                     onStateChange={handleStateChange}
                     onboardingData={onboardingData}
-                    initialMessages={messages}
                 />
             )
 
