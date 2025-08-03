@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Finapsis",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
