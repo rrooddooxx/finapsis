@@ -7,8 +7,8 @@ import {Badge} from "../ui/badge.tsx"
 import {ScrollArea} from "../ui/scroll-area.tsx"
 import {Separator} from "../ui/separator.tsx"
 import {Avatar, AvatarFallback} from "../ui/avatar.tsx"
-import type {Message, OnboardingData, ScreenProps} from "../../types"
-import {type AIResponse, getMockAIResponse} from "../../lib/mock-ai-responses.tsx"
+import type {Message, OnboardingData, ScreenProps, ChatMessageRequest} from "../../types"
+import {ChatService} from "../../services/chat.service"
 
 interface ChatScreenProps extends ScreenProps {
     onboardingData?: OnboardingData
@@ -53,28 +53,62 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
         setNewMessage("")
         setIsLoading(true)
 
-        // Simulate AI response delay
-        setTimeout(
-            () => {
-                const aiResponse: AIResponse = getMockAIResponse(
-                    currentMessage,
-                    onboardingData?.goal || ""
+        try {
+            // Create the request object
+            const messageRequest: ChatMessageRequest = {
+                message: currentMessage
+            }
+
+            // Send message to backend and get streaming response
+            const stream = await ChatService.sendMessage(messageRequest)
+            const reader = stream.getReader()
+            const decoder = new TextDecoder()
+
+            // Create initial bot message
+            const botMessage: Message = {
+                id: messages.length + 2,
+                text: "",
+                sender: "bot",
+                timestamp: new Date(),
+                type: "text",
+            }
+
+            setMessages((prev) => [...prev, botMessage])
+            setIsLoading(false)
+
+            // Read streaming response
+            let accumulated = ""
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value, { stream: true })
+                accumulated += chunk
+
+                // Update the bot message with accumulated text
+                setMessages((prev) => 
+                    prev.map((msg) => 
+                        msg.id === botMessage.id 
+                            ? { ...msg, text: accumulated }
+                            : msg
+                    )
                 )
+            }
+        } catch (error) {
+            console.error("Error sending message:", error)
+            
+            // Show error message
+            const errorMessage: Message = {
+                id: messages.length + 2,
+                text: "Lo siento, hubo un error al enviar tu mensaje. Por favor, inténtalo de nuevo.",
+                sender: "bot",
+                timestamp: new Date(),
+                type: "text",
+            }
 
-                const botMessage: Message = {
-                    id: messages.length + 2,
-                    text: aiResponse.text,
-                    component: aiResponse.component,
-                    sender: "bot",
-                    timestamp: new Date(),
-                    type: aiResponse.type,
-                }
-
-                setMessages((prev) => [...prev, botMessage])
-                setIsLoading(false)
-            },
-            1000 + Math.random() * 1000,
-        ) // Random delay between 1-2 seconds
+            setMessages((prev) => [...prev, errorMessage])
+            setIsLoading(false)
+        }
     }
 
     const handleReset = () => {

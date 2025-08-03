@@ -36,3 +36,7 @@ export interface ScreenProps {
   onStateChange: (state: AppState) => void
   isLoading?: boolean
 }
+
+export interface ChatMessageRequest {
+  message: string
+}

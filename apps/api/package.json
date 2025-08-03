@@ -10,6 +10,7 @@
     "lint": "echo 'Linting API...' && exit 0"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.0",
     "ai": "^5.0.0",
     "hono": "^4.8.9",
     "zod": "^4.0.14"

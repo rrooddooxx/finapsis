@@ -1,0 +1,15 @@
+meta {
+  name: api status
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{API_HOST}}/api/status
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

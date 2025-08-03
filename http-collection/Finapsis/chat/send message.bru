@@ -1,0 +1,21 @@
+meta {
+  name: send message
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{API_HOST}}/api/chat
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "message": "holaxxx"
+  }
+}
+
+settings {
+  encodeUrl: true
+}
