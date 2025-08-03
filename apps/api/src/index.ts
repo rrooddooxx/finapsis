@@ -2,10 +2,11 @@ import {Hono} from 'hono'
 import {cors} from 'hono/cors'
 import {logger} from 'hono/logger'
 import AppRouter from "./routing/router.main";
+import {devLogger} from "./utils/logger.utils";
 
 const app = new Hono()
 
-app.use('*', logger())
+app.use('*', logger(devLogger))
 app.use('*', cors())
 app.route("", AppRouter)
 

@@ -1,6 +1,7 @@
 import {Hono} from "hono";
-import {receiveChatMessage} from "./chat.controller";
+import {handleJsonChatInput, handleUiChatInput} from "./chat.controller";
 
 export const ChatRouter = new Hono().basePath("/chat")
 
-ChatRouter.post("/", receiveChatMessage)
+ChatRouter.post("/ui", handleUiChatInput)
+ChatRouter.post("/", handleJsonChatInput)
