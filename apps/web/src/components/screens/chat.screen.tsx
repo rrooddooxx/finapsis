@@ -19,11 +19,10 @@ export function ChatScreen({onStateChange, onboardingData}: ChatScreenProps) {
     const [input, setInput] = useState("")
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
-    console.log(import.meta.env.BACKEND_API_URL)
 
     const {messages, sendMessage, status} = useChat({
         transport: new DefaultChatTransport({
-            api: `${import.meta.env.BACKEND_API_URL || 'http://localhost:3000'}/api/chat/ui`,
+            api: `${import.meta.env.VITE_BACKEND_API_URL}/api/chat/ui`,
         }),
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls
     })
