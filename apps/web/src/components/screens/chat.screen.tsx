@@ -1,4 +1,4 @@
-import {useState, useEffect, useRef} from "react"
+import {useEffect, useRef, useState} from "react"
 import {Bot, Send, User} from "lucide-react"
 import {Button} from "../ui/button.tsx"
 import {Input} from "../ui/input.tsx"
@@ -7,8 +7,8 @@ import {Badge} from "../ui/badge.tsx"
 import {ScrollArea} from "../ui/scroll-area.tsx"
 import {Separator} from "../ui/separator.tsx"
 import {Avatar, AvatarFallback} from "../ui/avatar.tsx"
-import type {Message, OnboardingData, ScreenProps, ChatMessageRequest} from "../../types"
-import {ChatService} from "../../services/chat.service"
+import type {ChatMessageRequest, Message, OnboardingData, ScreenProps} from "@/types"
+import {ChatService} from "@/services/chat.service.ts"
 
 interface ChatScreenProps extends ScreenProps {
     onboardingData?: OnboardingData
@@ -20,12 +20,11 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
     const [newMessage, setNewMessage] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const scrollAreaRef = useRef<HTMLDivElement>(null)
 
     // Auto scroll to bottom when messages change
     const scrollToBottom = () => {
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ 
+            messagesEndRef.current.scrollIntoView({
                 behavior: "smooth",
                 block: "end"
             })
@@ -79,24 +78,24 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
             // Read streaming response
             let accumulated = ""
             while (true) {
-                const { done, value } = await reader.read()
+                const {done, value} = await reader.read()
                 if (done) break
 
-                const chunk = decoder.decode(value, { stream: true })
+                const chunk = decoder.decode(value, {stream: true})
                 accumulated += chunk
 
                 // Update the bot message with accumulated text
-                setMessages((prev) => 
-                    prev.map((msg) => 
-                        msg.id === botMessage.id 
-                            ? { ...msg, text: accumulated }
+                setMessages((prev) =>
+                    prev.map((msg) =>
+                        msg.id === botMessage.id
+                            ? {...msg, text: accumulated}
                             : msg
                     )
                 )
             }
         } catch (error) {
             console.error("Error sending message:", error)
-            
+
             // Show error message
             const errorMessage: Message = {
                 id: messages.length + 2,
@@ -214,9 +213,9 @@ export function ChatScreen({onStateChange, onboardingData, initialMessages = []}
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Scroll anchor - invisible element to scroll to */}
-                            <div ref={messagesEndRef} />
+                            <div ref={messagesEndRef}/>
                         </div>
                     </ScrollArea>
 
