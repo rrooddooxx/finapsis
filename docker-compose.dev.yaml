@@ -1,0 +1,40 @@
+# Development-specific overrides
+# Usage: docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml up
+
+services:
+  redis:
+    # Development-specific Redis configuration
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --loglevel notice
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_LOG_LEVEL=notice
+    volumes:
+      - redis_data:/data
+      - ./redis-dev.conf:/usr/local/etc/redis/redis.conf:ro # Optional custom config
+    # Enable debug logging in development
+    ports:
+      - "6379:6379"
+
+  # Always include Redis Commander in development
+  redis-commander:
+    profiles: [ ] # Remove profile restriction for development
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=dev
+      - HTTP_PASSWORD=dev123
+      - LOG_LEVEL=info
+
+  # Optional: Add a Redis CLI container for debugging
+  redis-cli:
+    image: redis:7.2-alpine
+    container_name: financial-assistant-redis-cli
+    command: redis-cli -h redis -p 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - financial_network
+    profiles:
+      - cli # Start with: docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile cli up
+    stdin_open: true
+    tty: true
