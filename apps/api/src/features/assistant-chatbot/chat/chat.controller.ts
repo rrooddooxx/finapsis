@@ -6,7 +6,12 @@ import {UIMessage} from "ai";
 
 export const handleUiChatInput = async (c: Context) => {
     const requestBody = await c.req.json<{ messages: UIMessage[] }>();
-    const result = await callChatOnIncomingMessage({input: 'ui', messages: requestBody.messages})
+    const userId = c.req.header('X-User-Email') || 'demo-user';
+    const result = await callChatOnIncomingMessage({
+        input: 'ui', 
+        messages: requestBody.messages, 
+        userId
+    })
     return result.toUIMessageStreamResponse({
         onError: (error) => {
             console.log('error: ', error)

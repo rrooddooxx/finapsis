@@ -1,5 +1,6 @@
 import {Hono} from "hono";
 import {ChatRouter} from "../features/assistant-chatbot/chat/chat.router";
+import {KnowledgeRouter} from "../features/general-knowledge/knowledge.router";
 
 const AppRouter = new Hono()
 
@@ -21,4 +22,5 @@ AppRouter.get('/api/status', (c) => {
 })
 
 AppRouter.route("/api", ChatRouter);
+AppRouter.route("/api/knowledge", KnowledgeRouter);
 export default AppRouter;

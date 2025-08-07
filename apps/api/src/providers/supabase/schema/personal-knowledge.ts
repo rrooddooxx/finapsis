@@ -5,10 +5,11 @@ import { z } from "zod";
 
 import { nanoid } from "../utils";
 
-export const resources = pgTable("resources", {
+export const personalKnowledge = pgTable("personal_knowledge", {
   id: varchar("id", { length: 191 })
     .primaryKey()
     .$defaultFn(() => nanoid()),
+  userId: varchar("user_id", { length: 191 }).notNull(),
   content: text("content").notNull(),
 
   createdAt: timestamp("created_at")
@@ -19,14 +20,15 @@ export const resources = pgTable("resources", {
     .default(sql`now()`),
 });
 
-// Schema for resources - used to validate API requests
-export const insertResourceSchema = createSelectSchema(resources)
+// Schema for personal knowledge - used to validate API requests
+export const insertPersonalKnowledgeSchema = createSelectSchema(personalKnowledge)
   .extend({})
   .omit({
     id: true,
     createdAt: true,
     updatedAt: true,
+    userId: true, // Se omite del esquema base pero se requerirá explícitamente
   });
 
-// Type for resources - used to type API request params and within Components
-export type NewResourceParams = z.infer<typeof insertResourceSchema>;
+// Type for personal knowledge - used to type API request params and within Components
+export type NewPersonalKnowledgeParams = z.infer<typeof insertPersonalKnowledgeSchema>;
