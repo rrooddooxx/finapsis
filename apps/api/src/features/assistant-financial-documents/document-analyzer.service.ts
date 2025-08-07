@@ -97,20 +97,25 @@ export class DocumentAnalyzerService {
 
             devLogger("🎉 OCI Document AI response:", JSON.stringify(response, null, 2));
 
-            // Safely extract job ID from the response
+            // Check if this is a synchronous response with immediate results
             const responseData = response as unknown;
-            let jobId: string | undefined;
-
             if (typeof responseData === 'object' && responseData !== null) {
                 const obj = responseData as Record<string, unknown>;
 
-                // Try different possible response structures
+                // Handle synchronous response with immediate results
                 if (obj.analyzeDocumentResult && typeof obj.analyzeDocumentResult === 'object') {
-                    const result = obj.analyzeDocumentResult as Record<string, unknown>;
-                    if (typeof result.jobId === 'string') {
-                        jobId = result.jobId;
-                    }
-                } else if (obj.processorJob && typeof obj.processorJob === 'object') {
+                    devLogger("📋 Synchronous response detected - processing immediate results");
+                    const extractedData = await this.parseAnalysisResults(obj.analyzeDocumentResult);
+                    
+                    return {
+                        status: 'completed',
+                        extractedData
+                    };
+                }
+
+                // Handle async response with job ID
+                let jobId: string | undefined;
+                if (obj.processorJob && typeof obj.processorJob === 'object') {
                     const job = obj.processorJob as Record<string, unknown>;
                     if (typeof job.id === 'string') {
                         jobId = job.id;
@@ -118,13 +123,20 @@ export class DocumentAnalyzerService {
                 } else if (typeof obj.jobId === 'string') {
                     jobId = obj.jobId;
                 }
+
+                if (jobId) {
+                    devLogger(`✨ Document analysis job created: ${jobId}`);
+                    return {
+                        jobId: jobId,
+                        status: 'processing'
+                    };
+                }
             }
 
-            devLogger(`✨ Document analysis job created: ${jobId || 'No job ID found'}`);
-
+            devLogger("⚠️ Unexpected response format - no results or job ID found");
             return {
-                jobId: jobId,
-                status: 'processing'
+                status: 'failed',
+                error: 'Unexpected response format from OCI Document AI'
             };
 
         } catch (error) {
@@ -187,17 +199,30 @@ export class DocumentAnalyzerService {
     }
 
     private buildAnalysisFeatures(config: DocumentAnalysisConfig) {
-        return config.features.map(feature => ({
-            featureType: this.mapFeatureTypeToOCI(feature.type),
-            maxResults: feature.maxResults || 50
-        }));
+        return config.features
+            .filter(feature => this.isFeatureSupportedForDocumentType(feature.type, config.documentType))
+            .map(feature => ({
+                featureType: this.mapFeatureTypeToOCI(feature.type),
+                maxResults: feature.maxResults || 50
+            }));
+    }
+
+    private isFeatureSupportedForDocumentType(featureType: string, documentType?: string): boolean {
+        // KEY_VALUE_EXTRACTION is only supported for specific document types
+        if (featureType === 'KEY_VALUE_DETECTION') {
+            const supportedTypes = ['INVOICE', 'RECEIPT', 'BANK_STATEMENT', 'CHECK', 'PAYSLIP', 'TAX_FORM'];
+            return supportedTypes.includes(documentType || '');
+        }
+        
+        // All other features are supported for all document types
+        return true;
     }
 
     private mapFeatureTypeToOCI(featureType: string): string {
         const featureTypeMap: Record<string, string> = {
-            'TEXT_DETECTION': 'TEXT_DETECTION',
-            'KEY_VALUE_DETECTION': 'KEY_VALUE_DETECTION',
-            'TABLE_EXTRACTION': 'TABLE_DETECTION',
+            'TEXT_DETECTION': 'TEXT_EXTRACTION',
+            'KEY_VALUE_DETECTION': 'KEY_VALUE_EXTRACTION',
+            'TABLE_EXTRACTION': 'TABLE_EXTRACTION',
             'LANGUAGE_CLASSIFICATION': 'LANGUAGE_CLASSIFICATION',
             'DOCUMENT_CLASSIFICATION': 'DOCUMENT_CLASSIFICATION'
         };
@@ -205,19 +230,57 @@ export class DocumentAnalyzerService {
         return featureTypeMap[featureType] || featureType;
     }
 
-    private async parseAnalysisResults(job: any): Promise<any> {
+    private async parseAnalysisResults(analysisResult: any): Promise<any> {
         try {
+            devLogger("🔍 Parsing analysis results:", JSON.stringify(analysisResult, null, 2));
+
+            // Extract text from words array in pages
+            let extractedText = '';
+            const tables: any[] = [];
+            const keyValues: any[] = [];
+
+            if (analysisResult.pages && Array.isArray(analysisResult.pages)) {
+                for (const page of analysisResult.pages) {
+                    // Extract text from words
+                    if (page.words && Array.isArray(page.words)) {
+                        const pageText = page.words.map((word: any) => word.text).join(' ');
+                        extractedText += pageText + '\n';
+                    }
+
+                    // Extract tables if present
+                    if (page.tables && Array.isArray(page.tables)) {
+                        tables.push(...page.tables);
+                    }
+
+                    // Extract key-value pairs if present
+                    if (page.keyValuePairs && Array.isArray(page.keyValuePairs)) {
+                        keyValues.push(...page.keyValuePairs);
+                    }
+                }
+            }
+
+            // Clean up the extracted text
+            extractedText = extractedText.trim();
+            devLogger("📝 Extracted text length:", extractedText.length, "characters");
+            devLogger("📄 Extracted text preview:", extractedText.substring(0, 200) + "...");
+
             const extractedData = {
-                text: job.outputLocation?.text || '',
-                tables: job.outputLocation?.tables || [],
-                keyValues: job.outputLocation?.keyValuePairs || [],
-                financialData: this.processFinancialDocument(job.outputLocation?.text || '')
+                text: extractedText,
+                tables: tables,
+                keyValues: keyValues,
+                financialData: this.processFinancialDocument(extractedText),
+                metadata: {
+                    pageCount: analysisResult.documentMetadata?.pageCount || 0,
+                    mimeType: analysisResult.documentMetadata?.mimeType || '',
+                    extractedAt: new Date().toISOString()
+                }
             };
 
+            devLogger("✅ Successfully parsed analysis results");
             return extractedData;
 
         } catch (error) {
-            console.error("Error parsing analysis results:", error);
+            devLogger("❌ Error parsing analysis results:", error);
             return null;
         }
     }
