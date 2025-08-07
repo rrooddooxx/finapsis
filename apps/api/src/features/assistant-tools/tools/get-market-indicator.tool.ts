@@ -11,7 +11,8 @@ const getMarketIndicatorAction = async ({indicator}: MarketIndicatorParams) => {
     const request = await fetch(`https://mindicador.cl/api/${indicatorParam}`)
     const response: MarketIndicatorResponse = await request.json();
     if (!response || !response?.serie) throw new HTTPException(500, {message: `Error from tool: ${AssistantTool.MARKET_INDICATORS}`})
-    return response?.serie?.[0]?.valor;
+    return response;
+    
 }
 
 

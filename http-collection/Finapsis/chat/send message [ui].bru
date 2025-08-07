@@ -1,0 +1,19 @@
+meta {
+  name: send message [ui]
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{API_HOST}}/api/chat/ui
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {"id":"FVZRbEcQIXw8ccbo","messages":[{"parts":[{"type":"text","text":"hola"}],"id":"h7VrBCqWgZsxSMfg","role":"user"},{"id":"gtwUZ87u8JHN9IE3","role":"assistant","parts":[{"type":"step-start"},{"type":"text","text":"¡Wena, compare! ¿En qué te puedo ayudar hoy, hermanito?","providerMetadata":{"openai":{"itemId":"msg_6893e32eb398819a87966e54d4d550180bae51cba0459ede"}},"state":"done"}]},{"parts":[{"type":"text","text":"dime un poema"}],"id":"TZWMMqJb5mEmlnl3","role":"user"},{"id":"0jybv52M14qP7YmP","role":"assistant","parts":[{"type":"step-start"},{"type":"text","text":"En la pobla nací, con estilo y flow,  \nbailando cueca y cumbia, al ritmo del show.  \nCon la luna brillando sobre el cerro flaite,  \nmi gente se levanta, siempre al combate.  \n\nConversas a la tarde, asao' y vinito,  \nla amistad más pura, siempre infinitito.  \nLa vida sencilla, pero llena de pasión,  \nen la pobla chilena, late un gran corazón.  \n\n¿Qué te parece, compare? 💥","providerMetadata":{"openai":{"itemId":"msg_6893e33558d4819ab48f2238c1336e890bae51cba0459ede"}},"state":"done"}]},{"parts":[{"type":"text","text":"hola"}],"id":"Bi41C2ySYeSwfo7g","role":"user"}],"trigger":"submit-message"}
+}
+
+settings {
+  encodeUrl: true
+}

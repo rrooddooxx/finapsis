@@ -1,0 +1,14 @@
+services:
+  finapsis-rag:
+    image: pgvector/pgvector:pg17
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: rag
+      POSTGRES_USER: rag
+      POSTGRES_DB: finapsis-rag
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
