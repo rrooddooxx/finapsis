@@ -1,12 +1,11 @@
-import {tool} from "ai";
-import {devLogger} from "../../../../utils/logger.utils";
-import {AssistantTool} from "../../tools.module";
-import {ReminderExtractionInputParams, reminderExtractionInputSchema, reminderExtractionSchema} from "../../schemas/reminder-extraction.schema";
-import {JobData, ReminderExtractionResponse} from "../../model/reminder-extraction.types";
+import {devLogger} from "../../../utils/logger.utils";
+import {AssistantTool} from "../../assistant-tools/tools.module";
+import {ReminderExtractionInputParams, reminderExtractionSchema} from "../schemas/reminder-extraction.schema";
+import {JobData, ReminderExtractionResponse} from "../types/reminder-extraction.types";
 import {generateObject} from "ai";
 import {openai} from "@ai-sdk/openai";
 import {Queue} from "bullmq";
-import {convertToChronPattern} from "../../../../utils/convert-to-chron-pattern.utils";
+import {convertToChronPattern} from "../../../utils/convert-to-chron-pattern.utils";
 
 const reminderQueue = new Queue('reminders', {
   connection: {
@@ -16,7 +15,7 @@ const reminderQueue = new Queue('reminders', {
   },
 });
 
-const createReminderAction = async ({ userMessage, userId }: ReminderExtractionInputParams): Promise<ReminderExtractionResponse> => {
+export const createReminderAction = async ({ userMessage, userId }: ReminderExtractionInputParams): Promise<ReminderExtractionResponse> => {
   devLogger("Tool Called!!", `Tool: ${AssistantTool.CREATE_REMINDER} |  Params: ${userMessage}, ${userId}`)
   try{
     const currentTime = Date.now();
@@ -100,9 +99,3 @@ const createReminderAction = async ({ userMessage, userId }: ReminderExtractionI
     }
   }
 }
-
-export const createReminderTool = tool({
-  description: 'Crea un recordatorio para el usuario basado en lenguaje natural',
-  inputSchema: reminderExtractionInputSchema,
-  execute: createReminderAction,
-})
