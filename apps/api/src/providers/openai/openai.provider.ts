@@ -4,7 +4,7 @@ import "../../shared/envs.shared"; // Import for Bun.env typing
 export const openAiProvider = () => {
     const client = createOpenAI({
         apiKey: Bun.env.OPENAI_API_KEY,
-        organization: "ainterprete",
+        // organization: "ainterprete",
     })
 
     return {
