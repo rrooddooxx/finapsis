@@ -22,18 +22,24 @@
     "ai": "^5.0.0",
     "bullmq": "^5.56.9",
     "hono": "^4.8.9",
-    "zod": "^4.0.14",
     "postgres": "^3.4.4",
     "drizzle-orm": "^0.31.2",
     "drizzle-zod": "^0.5.1",
-    "nanoid": "^5.0.7"
+    "nanoid": "^5.0.7",
+    "oci-aidocument": "^2.114.1",
+    "oci-aivision": "^2.114.1",
+    "oci-common": "^2.114.1",
+    "oci-objectstorage": "^2.114.1",
+    "oci-streaming": "^2.114.1",
+    "zod": "^4.0.14"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^5.3.3",
     "drizzle-kit": "^0.22.7",
     "pg": "^8.12.0",
     "dotenv": "^16.4.5",
-    "tsx": "^4.15.7"
+    "tsx": "^4.15.7",
+    "@types/node-fetch": "^2.6.13",
+    "typescript": "^5.3.3"
   }
 }

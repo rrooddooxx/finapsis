@@ -1,7 +1,11 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { devLogger } from "../../utils/logger.utils";
-import { resources } from "./schema/resources";
+import { personalKnowledge } from "./schema/personal-knowledge";
+import { personalEmbeddings } from "./schema/personal-embeddings";
+import { personalFinancialGoals } from "./schema/personal-financial-goals";
+import { generalFinancialKnowledge } from "./schema/general-financial-knowledge";
+import { generalFinancialEmbeddings } from "./schema/general-financial-embeddings";
 import { embeddings } from "./schema/embeddings";
 
 const POSTGRES_URL = process.env.DATABASE_URL;
@@ -20,7 +24,11 @@ export const clearAllData = async () => {
         
         // Delete in order (foreign key constraints)
         await supabase.delete(embeddings);
-        await supabase.delete(resources);
+        await supabase.delete(personalEmbeddings);
+        await supabase.delete(personalKnowledge);
+        await supabase.delete(generalFinancialEmbeddings);
+        await supabase.delete(generalFinancialKnowledge);
+        await supabase.delete(personalFinancialGoals);
         
         devLogger('✅ All data cleared successfully');
     } catch (error) {

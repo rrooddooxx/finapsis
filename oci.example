@@ -1,0 +1,64 @@
+# Oracle Cloud Infrastructure (OCI) Configuration File
+#
+# This is an example OCI config file that should be copied to ~/.oci/config
+#
+# Instructions:
+# 1. Create the .oci directory: mkdir -p ~/.oci
+# 2. Copy this file to ~/.oci/config
+# 3. Replace all placeholder values with your actual OCI credentials
+# 4. Save your private key to ~/.oci/oci_api_key.pem
+# 5. Set proper permissions: chmod 600 ~/.oci/oci_api_key.pem && chmod 600 ~/.oci/config
+#
+# To get your OCI credentials:
+# 1. Go to: https://console.oracle.com
+# 2. Navigate to: Identity -> Users -> Your User -> API Keys
+# 3. Generate a new API key pair if you don't have one
+# 4. Download the private key and save it as ~/.oci/oci_api_key.pem
+# 5. Copy the configuration values from the generated config preview
+# 6. Update your .env.local file with the same values for environment variable authentication
+#
+# For more information, see: https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdkconfig.htm
+
+[DEFAULT]
+# OCID of the user calling the API
+user=ocid1.user.oc1..aaaaaaaak77vwm3433ibncl5whc3xblqnpwyqakpoie7sxovkc42u7md6dyq
+
+# Fingerprint for the public key that was added to this user
+fingerprintd9:88:dd:76:e1:53:e1:a3:d0:cd:9a:a6:b0:ab:c9:00
+
+# Full path and filename of the private key (PEM format)
+key_file=~/.oci/oci_api_key.pem
+
+# OCID of your tenancy
+tenancy=ocid1.tenancy.oc1..aaaaaaaaxokk2gewz5xryccusugcdzidxvzooqgtuhswio5lrpk2uqnvsvhq
+
+# Oracle Cloud Infrastructure region
+region=us-phoenix-1
+
+# Optional: Passphrase for the private key (only if your key is encrypted)
+# pass_phrase=your_passphrase_here
+
+# Optional: Additional profile example for different environments
+#[DEVELOPMENT]
+#user=ocid1.user.oc1..your_dev_user_ocid_here
+#fingerprint=ab:cd:ef:12:34:56:78:90:ab:cd:ef:12:34:56:78:90
+#key_file=~/.oci/dev_api_key.pem
+#tenancy=ocid1.tenancy.oc1..your_dev_tenancy_ocid_here
+#region=us-ashburn-1
+
+#[PRODUCTION]
+#user=ocid1.user.oc1..your_prod_user_ocid_here
+#fingerprint=56:78:90:ab:cd:ef:12:34:56:78:90:ab:cd:ef:12:34
+#key_file=~/.oci/prod_api_key.pem
+#tenancy=ocid1.tenancy.oc1..your_prod_tenancy_ocid_here
+#region=us-phoenix-1
+
+# Note: The application will first try to use environment variables for authentication.
+# If environment variables are not found, it will fall back to this config file.
+#
+# Environment variables (preferred method for deployment):
+# - OCI_TENANCY_ID
+# - OCI_USER_ID
+# - OCI_FINGERPRINT
+# - OCI_PRIVATE_KEY_PATH
+# - OCI_REGION
