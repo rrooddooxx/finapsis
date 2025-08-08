@@ -49,36 +49,36 @@ export interface VisionAnalysisResult {
   error?: string;
 }
 
-// Zod schema for structured output
+// Simplified and more permissive Zod schema for OpenAI Vision
 const VisionAnalysisSchema = z.object({
-  extractedText: z.string().default('').describe("Complete text extracted from the image"),
-  amounts: z.array(z.number()).default([]).describe("All numeric amounts found in the document, sorted by relevance"),
-  dates: z.array(z.string()).default([]).describe("All dates found in the document in ISO format"),
+  extractedText: z.string().default('Sin texto extraído').describe("Complete text extracted from the image"),
+  amounts: z.array(z.number()).default([]).describe("All numeric amounts found in the document"),
+  dates: z.array(z.string()).default([]).describe("All dates found in the document"),
   merchantInfo: z.object({
-    merchantName: z.string().default('Unknown').describe("Name of the merchant or business"),
+    merchantName: z.string().default('Comercio desconocido').describe("Name of the merchant or business"),
     rut: z.string().optional().describe("Chilean RUT number if present"),
     giro: z.string().optional().describe("Business activity description"),
     address: z.string().optional().describe("Business address"),
     city: z.string().optional().describe("City location"),
-    confidence: z.number().min(0).max(1).default(0).describe("Confidence in merchant identification")
-  }).default({ merchantName: 'Unknown', confidence: 0 }),
+    confidence: z.number().min(0).max(1).default(0.1).describe("Confidence in merchant identification")
+  }).default({}),
   transactionInfo: z.object({
     transactionType: z.enum(['INCOME', 'EXPENSE']).default('EXPENSE').describe("Type of financial transaction"),
-    category: z.string().default('otros_gastos').describe("Category of expense/income (Chilean context)"),
+    category: z.string().default('otros_gastos').describe("Category of expense/income"),
     subcategory: z.string().optional().describe("More specific subcategory"),
     amount: z.number().default(0).describe("Main transaction amount"),
     currency: z.string().default('CLP').describe("Currency code"),
-    description: z.string().default('').describe("Transaction description"),
-    confidence: z.number().min(0).max(1).default(0).describe("Confidence in classification")
-  }).default({ transactionType: 'EXPENSE', category: 'otros_gastos', amount: 0, currency: 'CLP', description: '', confidence: 0 }),
+    description: z.string().default('Gasto general').describe("Transaction description"),
+    confidence: z.number().min(0).max(1).default(0.1).describe("Confidence in classification")
+  }).default({}),
   chileanContext: z.object({
     documentType: z.enum(['BOLETA', 'FACTURA', 'COMPROBANTE', 'RECIBO', 'TRANSFERENCIA', 'UNKNOWN']).default('UNKNOWN'),
     isChileanDocument: z.boolean().default(false).describe("Whether this appears to be a Chilean document"),
     language: z.enum(['es', 'en', 'mixed']).default('es').describe("Primary language of the document"),
     hasRUT: z.boolean().default(false).describe("Whether a Chilean RUT is present"),
     hasIVA: z.boolean().default(false).describe("Whether IVA (Chilean tax) is mentioned")
-  }).default({ documentType: 'UNKNOWN', isChileanDocument: false, language: 'es', hasRUT: false, hasIVA: false }),
-  confidence: z.number().min(0).max(1).default(0).describe("Overall confidence in the analysis")
+  }).default({}),
+  confidence: z.number().min(0).max(1).default(0.1).describe("Overall confidence in the analysis")
 });
 
 export class OpenAIVisionService {
@@ -97,30 +97,156 @@ export class OpenAIVisionService {
     try {
       devLogger('OpenAI Vision', '👁️ Starting image analysis for Chilean document', {
         objectName: request.objectName,
-        documentType: request.documentType
+        documentType: request.documentType,
+        imageMimeType: request.imageMimeType,
+        imageSize: Math.round(request.imageBase64.length / 1024) + 'KB'
       });
 
-      // Generate structured analysis using Vision model
-      const result = await generateObject({
-        model: this.client('gpt-4o-mini'), // GPT-4o-mini supports vision
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: this.buildChileanAnalysisPrompt(request.documentType)
-              },
-              {
-                type: 'image',
-                image: `data:${request.imageMimeType};base64,${request.imageBase64}`
-              }
-            ]
+      // First, try with a much simpler schema to see what OpenAI actually returns
+      let result;
+      try {
+        result = await generateObject({
+          model: this.client('gpt-4o-mini'), // GPT-4o-mini supports vision
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: this.buildChileanAnalysisPrompt(request.documentType)
+                },
+                {
+                  type: 'image',
+                  image: `data:${request.imageMimeType};base64,${request.imageBase64}`
+                }
+              ]
+            }
+          ],
+          schema: VisionAnalysisSchema,
+          temperature: 0.1,
+          maxRetries: 3,
+          onFailure: ({ failureCount, error }) => {
+            devLogger('OpenAI Vision', `⚠️ Schema validation attempt ${failureCount} failed`, { 
+              error: error.message,
+              errorStack: error.stack,
+              objectName: request.objectName,
+              userId: request.userId,
+              documentType: request.documentType,
+              imageMimeType: request.imageMimeType
+            });
           }
-        ],
-        schema: VisionAnalysisSchema,
-        temperature: 0.1, // Low temperature for consistent results
-      });
+        });
+      } catch (schemaError) {
+        devLogger('OpenAI Vision', '🔍 Schema validation failed, trying with generateText to see raw response', {
+          schemaError: schemaError.message
+        });
+        
+        // Fallback: get raw text response to debug what OpenAI is actually returning
+        const textResult = await generateText({
+          model: this.client('gpt-4o-mini'),
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `Analyze this Chilean financial document and return a valid JSON with the following structure:
+{
+  "extractedText": "complete text from image",
+  "amounts": [numbers found],
+  "dates": ["dates in ISO format"],
+  "merchantInfo": {
+    "merchantName": "merchant name",
+    "confidence": 0.8
+  },
+  "transactionInfo": {
+    "transactionType": "EXPENSE",
+    "category": "alimentacion",
+    "amount": 1000,
+    "currency": "CLP",
+    "description": "description",
+    "confidence": 0.8
+  },
+  "chileanContext": {
+    "documentType": "BOLETA",
+    "isChileanDocument": true,
+    "language": "es",
+    "hasRUT": true,
+    "hasIVA": false
+  },
+  "confidence": 0.8
+}
+
+Return ONLY the JSON, no other text.`
+                },
+                {
+                  type: 'image',
+                  image: `data:${request.imageMimeType};base64,${request.imageBase64}`
+                }
+              ]
+            }
+          ],
+          temperature: 0.1
+        });
+
+        devLogger('OpenAI Vision', '🔍 Raw OpenAI response for debugging', {
+          rawResponse: textResult.text.substring(0, 1000) + (textResult.text.length > 1000 ? '...' : ''),
+          responseLength: textResult.text.length
+        });
+
+        // Try to manually parse the JSON response
+        try {
+          const cleanedResponse = textResult.text.trim().replace(/```json\s?/, '').replace(/```\s?$/, '');
+          const parsedResponse = JSON.parse(cleanedResponse);
+          
+          // Manually validate and create result object
+          result = {
+            object: {
+              extractedText: parsedResponse.extractedText || 'Sin texto extraído',
+              amounts: Array.isArray(parsedResponse.amounts) ? parsedResponse.amounts : [],
+              dates: Array.isArray(parsedResponse.dates) ? parsedResponse.dates : [],
+              merchantInfo: {
+                merchantName: parsedResponse.merchantInfo?.merchantName || 'Comercio desconocido',
+                rut: parsedResponse.merchantInfo?.rut,
+                giro: parsedResponse.merchantInfo?.giro,
+                address: parsedResponse.merchantInfo?.address,
+                city: parsedResponse.merchantInfo?.city,
+                confidence: parsedResponse.merchantInfo?.confidence || 0.1
+              },
+              transactionInfo: {
+                transactionType: parsedResponse.transactionInfo?.transactionType || 'EXPENSE',
+                category: parsedResponse.transactionInfo?.category || 'otros_gastos',
+                subcategory: parsedResponse.transactionInfo?.subcategory,
+                amount: parsedResponse.transactionInfo?.amount || 0,
+                currency: parsedResponse.transactionInfo?.currency || 'CLP',
+                description: parsedResponse.transactionInfo?.description || 'Gasto general',
+                confidence: parsedResponse.transactionInfo?.confidence || 0.1
+              },
+              chileanContext: {
+                documentType: parsedResponse.chileanContext?.documentType || 'UNKNOWN',
+                isChileanDocument: parsedResponse.chileanContext?.isChileanDocument || false,
+                language: parsedResponse.chileanContext?.language || 'es',
+                hasRUT: parsedResponse.chileanContext?.hasRUT || false,
+                hasIVA: parsedResponse.chileanContext?.hasIVA || false
+              },
+              confidence: parsedResponse.confidence || 0.1
+            }
+          };
+
+          devLogger('OpenAI Vision', '✅ Successfully parsed fallback JSON response', {
+            merchantName: result.object.merchantInfo.merchantName,
+            amount: result.object.transactionInfo.amount,
+            category: result.object.transactionInfo.category
+          });
+
+        } catch (parseError) {
+          devLogger('OpenAI Vision', '❌ Failed to parse fallback JSON response', {
+            parseError: parseError.message,
+            rawResponsePreview: textResult.text.substring(0, 500)
+          });
+          throw schemaError; // Re-throw original schema error
+        }
+      }
 
       const processingTime = Date.now() - startTime;
 
@@ -155,20 +281,20 @@ export class OpenAIVisionService {
 
       return {
         success: false,
-        extractedText: '',
+        extractedText: 'Error al procesar imagen',
         amounts: [],
         dates: [],
         merchantInfo: {
-          merchantName: '',
-          confidence: 0
+          merchantName: 'Error de procesamiento',
+          confidence: 0.1
         },
         transactionInfo: {
           transactionType: 'EXPENSE',
           category: 'otros_gastos',
           amount: 0,
           currency: 'CLP',
-          description: '',
-          confidence: 0
+          description: 'Error al analizar documento',
+          confidence: 0.1
         },
         chileanContext: {
           documentType: 'UNKNOWN',
@@ -177,7 +303,7 @@ export class OpenAIVisionService {
           hasRUT: false,
           hasIVA: false
         },
-        confidence: 0,
+        confidence: 0.1,
         processingTime,
         error: errorMessage
       };
@@ -189,48 +315,57 @@ export class OpenAIVisionService {
    */
   private buildChileanAnalysisPrompt(documentType?: string): string {
     return `
-Analiza esta imagen de un documento financiero chileno con extrema precisión y extrae toda la información relevante.
+Analiza esta imagen de un documento financiero chileno y devuelve EXACTAMENTE la estructura JSON solicitada.
 
-CONTEXTO CHILENO IMPORTANTE:
-- Busca RUT (formato: XX.XXX.XXX-X)
-- Identifica tipos de documento: BOLETA ELECTRÓNICA, FACTURA, COMPROBANTE, etc.
-- Reconoce comercios chilenos comunes: Jumbo, Líder, Unimarc, Copec, Shell, BancoEstado, etc.
-- Formatos de moneda: $1.234.567 (punto como separador de miles)
-- IVA incluido/exento
-- Direcciones chilenas (comunas, regiones)
+IMPORTANTE: Responde SOLO con JSON válido, sin markdown, sin explicaciones adicionales.
 
-COMERCIOS Y CATEGORÍAS CHILENAS:
-- Supermercados: Jumbo, Líder, Unimarc, Santa Isabel → alimentación
-- Farmacias: Cruz Verde, Salcobrand, FASA → salud
-- Retail: Falabella, Ripley, Paris → vestimenta/hogar
-- Combustible: Copec, Shell, Petrobras → transporte
-- Servicios: Enel, CGE, Aguas Andinas → servicios_básicos
-- Restaurants: McDonald's, Subway, locales → alimentación
-- Bancos: BancoEstado, Santander, BCI → servicios_financieros
+ESTRUCTURA REQUERIDA:
+{
+  "extractedText": "todo el texto visible en la imagen",
+  "amounts": [lista de números encontrados],
+  "dates": ["fechas en formato YYYY-MM-DD"],
+  "merchantInfo": {
+    "merchantName": "nombre del comercio",
+    "rut": "RUT si está presente",
+    "confidence": 0.8
+  },
+  "transactionInfo": {
+    "transactionType": "EXPENSE o INCOME",
+    "category": "categoría apropiada",
+    "amount": número_principal,
+    "currency": "CLP",
+    "description": "descripción",
+    "confidence": 0.8
+  },
+  "chileanContext": {
+    "documentType": "BOLETA, FACTURA, COMPROBANTE, RECIBO, TRANSFERENCIA, o UNKNOWN",
+    "isChileanDocument": true/false,
+    "language": "es",
+    "hasRUT": true/false,
+    "hasIVA": true/false
+  },
+  "confidence": 0.8
+}
 
-INSTRUCCIONES DE ANÁLISIS:
-1. Lee TODO el texto visible en la imagen, incluso texto pequeño o borroso
-2. Identifica el comercio/merchant exactamente como aparece
-3. Extrae TODOS los montos numéricos (precios, subtotales, total, IVA)
-4. Encuentra fechas en cualquier formato (DD/MM/YYYY, DD-MM-YYYY, etc.)
-5. Determina si es INGRESO (sueldo, venta, transferencia recibida) o GASTO (compra, pago)
-6. Clasifica en categorías chilenas apropiadas
-7. Calcula el monto principal de la transacción (usualmente el TOTAL)
+CATEGORÍAS VÁLIDAS:
+alimentacion, electronica, transporte, salud, educacion, servicios_basicos, entretenimiento, vestimenta, hogar, servicios_financieros, otros_gastos
 
-CATEGORÍAS CHILENAS:
-- alimentacion (supermercados, restaurantes, comida)
-- electronica (computadores, celulares, TV, tablets, tarjetas SD, accesorios tech)
-- transporte (combustible, transporte público, Uber, taxi)
-- salud (farmacias, consultas médicas, medicamentos)
-- educacion (colegios, universidades, libros, cursos)
-- servicios_basicos (luz, agua, gas, internet, telefonía)
-- entretenimiento (cine, eventos, streaming, juegos)
-- vestimenta (ropa, calzado, accesorios)
-- hogar (muebles, electrodomésticos, decoración)
-- servicios_financieros (bancos, seguros, créditos)
-- otros_gastos (misceláneos)
+COMERCIOS CHILENOS COMUNES:
+Jumbo, Líder, Unimarc → alimentacion
+Cruz Verde, Salcobrand → salud  
+Falabella, Ripley → vestimenta
+Copec, Shell → transporte
+Enel, CGE → servicios_basicos
 
-Responde con la máxima precisión posible, especialmente para el contexto chileno.
+INSTRUCCIONES:
+1. Extrae TODO el texto visible
+2. Identifica montos (formato $1.234.567)
+3. Encuentra fechas (DD/MM/YYYY, etc.)
+4. Determina si es INCOME o EXPENSE
+5. Categoriza apropiadamente
+6. Usa monto TOTAL como amount principal
+
+Responde SOLO con el JSON, nada más.
     `.trim();
   }
 

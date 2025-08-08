@@ -2,6 +2,7 @@ import {openAiProvider} from "../../../providers/openai/openai.provider";
 import {convertToModelMessages, ModelMessage, stepCountIs, streamText, UIMessage} from "ai";
 import {AssistantTools, AssistantTool} from "../../assistant-tools/tools.module";
 import {ChatRequest} from "../../../shared/types/chat.request";
+import {asyncChatMessageService} from "../async-chat-message.service";
 
 export type OnIncomingMessageParams = {
     input: 'ui',
@@ -89,6 +90,13 @@ export const callChatOnIncomingMessage = async ({input, messages, userId = 'demo
         content: CONTENT_ONLY_RAG.replace(/USER_ID_PLACEHOLDER/g, userId),
     }];
 
+    // Check for pending async messages (file upload confirmations, transaction requests, etc.)
+    const pendingMessages = asyncChatMessageService.getPendingMessages(userId);
+    if (pendingMessages.length > 0) {
+        // Convert async messages to core messages and inject them
+        const asyncMessages = asyncChatMessageService.convertToCoreMessages(pendingMessages);
+        prompts.push(...asyncMessages);
+    }
 
     return streamText({
         model: client('gpt-4o'),

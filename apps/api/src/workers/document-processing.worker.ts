@@ -6,6 +6,7 @@ import {
 import { documentProcessingOrchestrator } from '../features/assistant-financial-documents/document-processing-orchestrator.service';
 import { documentClassificationLLMService } from '../features/assistant-financial-documents/document-classification-llm.service';
 import { transactionConfirmationService } from '../features/assistant-financial-documents/transaction-confirmation.service';
+import { asyncChatMessageService } from '../features/assistant-chatbot/async-chat-message.service';
 import {queueService} from './services/queue.service';
 import {
     DocumentAnalysisJobData,
@@ -386,20 +387,17 @@ export class DocumentProcessingWorker {
             // Generate confirmation message
             const confirmationMessage = transactionConfirmationService.generateConfirmationMessage(data.transactionDetails);
 
-            // Here we would send this message to the chat interface
-            // For now, we'll log it and simulate the message being sent
-            // In a real implementation, this would integrate with the chat service
+            devLogger('Confirmation Worker', `📨 Sending confirmation message to chat via SSE for processing log: ${data.processingLogId}`);
             
-            devLogger('Confirmation Worker', `📨 Confirmation message generated for processing log: ${data.processingLogId}`);
-            devLogger('Confirmation Worker', `Message: ${confirmationMessage}`);
+            // Send confirmation request message to chat interface via SSE
+            await asyncChatMessageService.sendTransactionConfirmationRequest(
+                data.userId,
+                confirmationMessage,
+                data.processingLogId,
+                data.transactionDetails
+            );
 
-            // TODO: Implement actual chat message sending
-            // This could be done via:
-            // 1. WebSocket message to connected clients
-            // 2. Adding a message to the chat conversation
-            // 3. Triggering a notification system
-            
-            // For now, mark as successful
+            devLogger('Confirmation Worker', `✅ Confirmation message sent to user ${data.userId} via async messaging`);
             return {
                 status: 'confirmation_sent',
                 userId: data.userId,

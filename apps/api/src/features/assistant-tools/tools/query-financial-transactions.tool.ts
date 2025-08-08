@@ -30,6 +30,7 @@ const queryFinancialTransactionsAction = async (params: {
 
   try {
     devLogger('QueryFinancialTransactions', `🔍 Querying financial transactions for user: ${userId}`);
+    devLogger('QueryFinancialTransactions', `🔍 User ID validation - Type: ${typeof userId}, Length: ${userId.length}, Is UUID: ${/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)}`);
     devLogger('QueryFinancialTransactions', `Filters: type=${transactionType}, category=${category}, amount=${amountFrom}-${amountTo}, dates=${dateFrom} to ${dateTo}, merchant=${merchant}`);
 
     // Build filters

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Bot, Send, Upload, User } from "lucide-react";
 import { Button } from "../ui/button.tsx";
 import { Input } from "../ui/input.tsx";
@@ -15,6 +15,7 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
 import ReactMarkdown from "react-markdown";
+import { useRealtimeChat } from "@/hooks/useRealtimeChat";
 
 interface ChatScreenProps extends ScreenProps {
   onboardingData?: OnboardingData;
@@ -32,7 +33,7 @@ export function ChatScreen({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadInfo, setUploadInfo] = useState<string | null>(null);
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, setMessages, append } = useChat({
     transport: new DefaultChatTransport({
       api: `${import.meta.env.VITE_BACKEND_API_URL}/api/chat/ui`,
       headers: {
@@ -40,6 +41,58 @@ export function ChatScreen({
       },
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+  });
+
+  // Handle real-time system messages (file upload confirmations, transaction confirmations)
+  const handleRealtimeMessage = useCallback((realtimeMessage: any) => {
+    console.log('🎯 ChatScreen received real-time message:', realtimeMessage);
+    console.log('🎯 Current messages before adding:', messages.length);
+    console.log('🎯 Message structure:', {
+      id: realtimeMessage.id,
+      role: realtimeMessage.role,
+      content: realtimeMessage.content,
+      createdAt: realtimeMessage.createdAt
+    });
+    
+    // Ensure the message has the correct structure for @ai-sdk/react with parts
+    const formattedMessage = {
+      id: realtimeMessage.id,
+      role: realtimeMessage.role as 'assistant',
+      content: realtimeMessage.content,
+      createdAt: realtimeMessage.createdAt || new Date(),
+      // Add parts structure that the rendering expects
+      parts: [
+        {
+          type: 'text' as const,
+          text: realtimeMessage.content,
+        }
+      ]
+    };
+    
+    // Check if message already exists to prevent duplicates
+    const exists = messages.some(msg => msg.id === formattedMessage.id);
+    if (exists) {
+      console.log('⚠️ Message already exists, skipping:', formattedMessage.id);
+      return;
+    }
+    
+    // Use append method from useChat to add the message properly
+    console.log('🚀 Using append to add message:', formattedMessage);
+    append({
+      role: 'assistant',
+      content: realtimeMessage.content,
+      id: realtimeMessage.id,
+    });
+    
+    // Auto-scroll to show the new system message
+    setTimeout(() => scrollToBottom(), 200);
+  }, []); // Remove setMessages dependency to prevent issues
+
+  // Set up real-time chat connection
+  const { isConnected } = useRealtimeChat({
+    userEmail,
+    onMessage: handleRealtimeMessage,
+    enabled: !!userEmail,
   });
 
   const scrollToBottom = () => {
@@ -131,10 +184,10 @@ export function ChatScreen({
                 </p>
               </div>
               <Badge
-                variant="secondary"
-                className="text-xs bg-secondary text-secondary-foreground"
+                variant={isConnected ? "default" : "secondary"}
+                className={`text-xs ${isConnected ? "bg-green-500 text-white" : "bg-secondary text-secondary-foreground"}`}
               >
-                En línea
+                {isConnected ? "🔔 Tiempo Real" : "💬 Chat"}
               </Badge>
             </div>
           </CardHeader>

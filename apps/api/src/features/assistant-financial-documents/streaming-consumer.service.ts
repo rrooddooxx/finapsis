@@ -209,27 +209,50 @@ export class StreamingConsumerService {
 
     // Helper methods for extracting metadata from object names and events
     private extractUserIdFromObjectName(objectName: string): string {
-        // Try to extract user ID from object name patterns
+        // Object names follow pattern: userId/fileName (from document-upload.service.ts:17)
+        // where userId is a UUID from the database
         // Examples:
-        // - user123_receipt_20241107.jpg -> user123
-        // - receipts/user456/document.pdf -> user456
-        // - users/user789/documents/file.pdf -> user789
+        // - 550e8400-e29b-41d4-a716-446655440000/receipt_20241107.jpg
+        // - b4c8f2e0-1234-5678-9abc-def123456789/document.pdf
         
-        const patterns = [
+        devLogger('StreamingConsumerService', `🔍 Extracting user ID from object name: ${objectName}`);
+        
+        // Split by '/' and take the first part as userId
+        const pathParts = objectName.split('/');
+        if (pathParts.length >= 2) {
+            const userId = pathParts[0];
+            
+            // Validate that it looks like a UUID (basic validation)
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidPattern.test(userId)) {
+                devLogger('StreamingConsumerService', `✅ Extracted user ID: ${userId}`);
+                return userId;
+            } else {
+                // If first part doesn't look like UUID, it might be a legacy pattern
+                devLogger('StreamingConsumerService', `⚠️ First part '${userId}' doesn't match UUID pattern, treating as legacy user ID`);
+                return userId;
+            }
+        }
+        
+        // Fallback: try legacy patterns for backward compatibility
+        const legacyPatterns = [
             /(?:^|\/|_)user(\w+)(?:_|\/|\.)/i,      // user123_ or /user123/ or user123.
             /\/users\/([^\/]+)\//i,                   // /users/userId/
             /\/(\w+)\/documents\//i                   // /userId/documents/
         ];
         
-        for (const pattern of patterns) {
+        for (const pattern of legacyPatterns) {
             const match = objectName.match(pattern);
             if (match && match[1]) {
+                devLogger('StreamingConsumerService', `✅ Extracted user ID via legacy pattern: ${match[1]}`);
                 return match[1];
             }
         }
         
-        // If no user ID found, generate a random UUID for tracking
-        return `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        // If no user ID found, generate a fallback ID and log warning
+        const fallbackId = `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        devLogger('StreamingConsumerService', `⚠️ Could not extract user ID from object name '${objectName}', using fallback: ${fallbackId}`);
+        return fallbackId;
     }
 
     private determineSource(objectName: string): 'whatsapp' | 'web' | 'api' {

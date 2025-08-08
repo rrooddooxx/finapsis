@@ -2,6 +2,7 @@ import {Hono} from "hono";
 import {ChatRouter} from "../features/assistant-chatbot/chat/chat.router";
 import {KnowledgeRouter} from "../features/general-knowledge/knowledge.router";
 import documentUploadRouter from "../features/document-upload/document-upload.router";
+import {realtimeChatRouter} from "../features/assistant-chatbot/realtime-chat.controller";
 
 const AppRouter = new Hono()
 
@@ -25,4 +26,5 @@ AppRouter.get('/api/status', (c) => {
 AppRouter.route("/api", ChatRouter);
 AppRouter.route("/api/knowledge", KnowledgeRouter);
 AppRouter.route("/api/files", documentUploadRouter);
+AppRouter.route("/api/chat/realtime", realtimeChatRouter);
 export default AppRouter;

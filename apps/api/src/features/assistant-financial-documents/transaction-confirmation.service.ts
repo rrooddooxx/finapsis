@@ -129,7 +129,8 @@ export class TransactionConfirmationService {
     userId: string
   ): Promise<ConfirmationResponse> {
     
-    devLogger('TransactionConfirmationService', `💾 Storing confirmed transaction - User: ${userId}, Amount: ${transactionData.currency} ${transactionData.amount}`);
+    devLogger('TransactionConfirmationService', `💾 Storing confirmed transaction - User ID: ${userId}, Amount: ${transactionData.currency} ${transactionData.amount}`);
+    devLogger('TransactionConfirmationService', `🔍 User ID type: ${typeof userId}, Length: ${userId.length}, Is UUID format: ${/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)}`);
 
     try {
       const transaction = await financialTransactionRepository.create({
@@ -158,7 +159,7 @@ export class TransactionConfirmationService {
       return {
         success: true,
         transactionId: transaction.id,
-        message: `✅ Transacción guardada correctamente en tu historial financiero.\n\n📊 **Resumen:**\n- Tipo: ${transactionData.transactionType === 'EXPENSE' ? 'Gasto' : 'Ingreso'}\n- Categoría: ${transactionData.category}\n- Monto: ${transactionData.currency} ${transactionData.amount.toLocaleString('es-CL')}\n- Comercio: ${transactionData.merchant || 'No especificado'}\n- Fecha: ${transactionData.transactionDate.toLocaleDateString('es-CL')}`
+        message: `✅ Transacción guardada correctamente en tu historial financiero.\n\n📊 **Resumen:**\n- Tipo: ${transactionData.transactionType === 'EXPENSE' ? 'Gasto' : 'Ingreso'}\n- Categoría: ${transactionData.category}\n- Monto: ${transactionData.currency} ${transactionData.amount.toLocaleString('es-CL')}\n- Comercio: ${transactionData.merchant || 'No especificado'}\n- Fecha: ${typeof transactionData.transactionDate === 'string' ? new Date(transactionData.transactionDate).toLocaleDateString('es-CL') : transactionData.transactionDate.toLocaleDateString('es-CL')}`
       };
 
     } catch (error) {
@@ -179,7 +180,20 @@ export class TransactionConfirmationService {
   generateConfirmationMessage(transactionDetails: ConfirmationRequestData['transactionDetails']): string {
     const transactionTypeText = transactionDetails.transactionType === 'EXPENSE' ? '💸 Gasto' : '💰 Ingreso';
     const amountFormatted = `${transactionDetails.currency} ${transactionDetails.amount.toLocaleString('es-CL')}`;
-    const dateFormatted = transactionDetails.transactionDate.toLocaleDateString('es-CL');
+    
+    // Handle date formatting - transactionDate might be a string or Date object
+    let dateFormatted: string;
+    try {
+      const date = typeof transactionDetails.transactionDate === 'string' 
+        ? new Date(transactionDetails.transactionDate) 
+        : transactionDetails.transactionDate;
+      
+      dateFormatted = date.toLocaleDateString('es-CL');
+    } catch (error) {
+      devLogger('TransactionConfirmationService', `⚠️ Error formatting date: ${error}. Using raw value.`);
+      dateFormatted = String(transactionDetails.transactionDate);
+    }
+    
     const confidencePercent = Math.round(transactionDetails.confidence * 100);
 
     return `📄 **He analizado tu documento financiero:**

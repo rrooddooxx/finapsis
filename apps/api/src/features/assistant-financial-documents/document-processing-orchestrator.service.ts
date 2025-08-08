@@ -48,6 +48,7 @@ export class DocumentProcessingOrchestrator {
     const documentId = nanoid();
     
     devLogger('DocumentProcessingOrchestrator', `🚀 Starting document processing pipeline - Document: ${documentId}, User: ${request.userId}, Object: ${request.objectName}`);
+    devLogger('DocumentProcessingOrchestrator', `🔍 User ID validation - Type: ${typeof request.userId}, Length: ${request.userId.length}, Is UUID: ${/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.userId)}`);
 
     // Create processing log entry
     const processingLog = await this.createProcessingLog(request, documentId);

@@ -35,4 +35,6 @@ startServer();
 export default {
     port: process.env.PORT || 3000,
     fetch: app.fetch,
+    // Configure maximum idle timeout for SSE connections (4 minutes - Bun's limit is 255 seconds)
+    idleTimeout: 255, // 255 seconds (4.25 minutes) - Bun's maximum allowed value
 }

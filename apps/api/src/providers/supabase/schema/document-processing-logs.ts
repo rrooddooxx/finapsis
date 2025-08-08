@@ -14,30 +14,33 @@ import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { nanoid } from "../utils";
 
-// Enum for processing status
+// Enum for processing status - match database order
 export const processingStatusEnum = pgEnum('processing_status', [
   'QUEUED',
   'PROCESSING_OCR',
-  'PROCESSING_VISION',
   'PROCESSING_CLASSIFICATION',
   'PROCESSING_LLM_VERIFICATION',
   'COMPLETED',
   'FAILED',
   'TIMEOUT',
-  'MANUAL_REVIEW_REQUIRED'
+  'MANUAL_REVIEW_REQUIRED',
+  'PROCESSING_VISION',
+  'PENDING_CONFIRMATION'
 ]);
 
-// Enum for processing stage
+// Enum for processing stage - match database order  
 export const processingStageEnum = pgEnum('processing_stage', [
   'DOCUMENT_UPLOAD',
   'OCR_EXTRACTION',
-  'VISION_ANALYSIS',
   'DOCUMENT_CLASSIFICATION', 
   'TEXT_ANALYSIS',
   'LLM_VERIFICATION',
   'TRANSACTION_CREATION',
   'CONFIDENCE_SCORING',
-  'FINAL_VALIDATION'
+  'FINAL_VALIDATION',
+  'VISION_ANALYSIS',
+  'USER_CONFIRMATION',
+  'CONFIRMATION_PROCESSING'
 ]);
 
 export const documentProcessingLogs = pgTable(
@@ -126,8 +129,8 @@ export const insertDocumentProcessingLogSchema = z.object({
   bucketName: z.string().min(1, "Bucket name is required"),
   objectName: z.string().min(1, "Object name is required"),
   namespace: z.string().min(1, "Namespace is required"),
-  status: z.enum(['QUEUED', 'PROCESSING_OCR', 'PROCESSING_VISION', 'PROCESSING_CLASSIFICATION', 'PROCESSING_LLM_VERIFICATION', 'COMPLETED', 'FAILED', 'TIMEOUT', 'MANUAL_REVIEW_REQUIRED']).default('QUEUED'),
-  currentStage: z.enum(['DOCUMENT_UPLOAD', 'OCR_EXTRACTION', 'VISION_ANALYSIS', 'DOCUMENT_CLASSIFICATION', 'TEXT_ANALYSIS', 'LLM_VERIFICATION', 'TRANSACTION_CREATION', 'CONFIDENCE_SCORING', 'FINAL_VALIDATION']).default('DOCUMENT_UPLOAD'),
+  status: z.enum(['QUEUED', 'PROCESSING_OCR', 'PROCESSING_CLASSIFICATION', 'PROCESSING_LLM_VERIFICATION', 'COMPLETED', 'FAILED', 'TIMEOUT', 'MANUAL_REVIEW_REQUIRED', 'PROCESSING_VISION', 'PENDING_CONFIRMATION']).default('QUEUED'),
+  currentStage: z.enum(['DOCUMENT_UPLOAD', 'OCR_EXTRACTION', 'DOCUMENT_CLASSIFICATION', 'TEXT_ANALYSIS', 'LLM_VERIFICATION', 'TRANSACTION_CREATION', 'CONFIDENCE_SCORING', 'FINAL_VALIDATION', 'VISION_ANALYSIS', 'USER_CONFIRMATION', 'CONFIRMATION_PROCESSING']).default('DOCUMENT_UPLOAD'),
   documentType: z.string().max(50).optional(),
   detectedLanguage: z.string().max(10).default('es'),
   overallConfidence: z.number().min(0).max(1).optional(),
@@ -207,7 +210,7 @@ export const llmResponseSchema = z.object({
 
 // Error tracking schema
 export const processingErrorSchema = z.object({
-  stage: z.enum(['DOCUMENT_UPLOAD', 'OCR_EXTRACTION', 'VISION_ANALYSIS', 'DOCUMENT_CLASSIFICATION', 'TEXT_ANALYSIS', 'LLM_VERIFICATION', 'TRANSACTION_CREATION', 'CONFIDENCE_SCORING', 'FINAL_VALIDATION']),
+  stage: z.enum(['DOCUMENT_UPLOAD', 'OCR_EXTRACTION', 'DOCUMENT_CLASSIFICATION', 'TEXT_ANALYSIS', 'LLM_VERIFICATION', 'TRANSACTION_CREATION', 'CONFIDENCE_SCORING', 'FINAL_VALIDATION', 'VISION_ANALYSIS', 'USER_CONFIRMATION', 'CONFIRMATION_PROCESSING']),
   error: z.string(),
   timestamp: z.string(), // ISO timestamp
   details: z.record(z.any()).optional(),
