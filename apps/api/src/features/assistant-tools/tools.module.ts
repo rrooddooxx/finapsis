@@ -7,6 +7,7 @@ import {createPersonalGoalTool} from "./tools/create-personal-goal.tool";
 import {getPersonalGoalsTool} from "./tools/get-personal-goals.tool";
 import {updatePersonalGoalTool} from "./tools/update-personal-goal.tool";
 import {createReminderTool} from "./tools/create-reminder.tool";
+import {getGeneralKnowledgeTool} from "./tools/get-general-knowledge.tool";
 
 export enum AssistantTool {
     ANALYZE_FINANCIAL_DOCUMENT = 'ANALYZE_FINANCIAL_DOCUMENT',
@@ -17,7 +18,8 @@ export enum AssistantTool {
     CREATE_PERSONAL_GOAL = 'CREATE_PERSONAL_GOAL',
     GET_PERSONAL_GOALS = 'GET_PERSONAL_GOALS',
     UPDATE_PERSONAL_GOAL = 'UPDATE_PERSONAL_GOAL',
-    CREATE_REMINDER = 'CREATE_REMINDER'
+    CREATE_REMINDER = 'CREATE_REMINDER',
+    GET_GENERAL_KNOWLEDGE = 'GET_GENERAL_KNOWLEDGE'
 }
 
 export const AssistantTools = {
@@ -29,5 +31,6 @@ export const AssistantTools = {
     [AssistantTool.CREATE_PERSONAL_GOAL]: createPersonalGoalTool,
     [AssistantTool.GET_PERSONAL_GOALS]: getPersonalGoalsTool,
     [AssistantTool.UPDATE_PERSONAL_GOAL]: updatePersonalGoalTool,
-    [AssistantTool.CREATE_REMINDER]: createReminderTool
+    [AssistantTool.CREATE_REMINDER]: createReminderTool,
+    [AssistantTool.GET_GENERAL_KNOWLEDGE]: getGeneralKnowledgeTool
 }

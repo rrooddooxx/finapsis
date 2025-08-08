@@ -112,9 +112,10 @@ export const searchGeneralFinancialKnowledge = async (
             entityTypes: ['general_financial_knowledge'],
             includeUserContent: false,
             includeGeneralContent: true,
-            metadataFilters: category && category !== 'general' ? { category } : undefined,
+            // Category filter disabled - embeddings may not have correct metadata structure
+            // metadataFilters: category && category !== 'general' ? { category } : undefined,
             limit,
-            threshold: 0.5
+            threshold: 0.1
         });
 
         console.log('🔍 General knowledge results found:', results?.length || 0);
@@ -129,12 +130,15 @@ export const searchGeneralFinancialKnowledge = async (
         }
 
         // Map to legacy format
-        return results.map(r => ({
-            content: r.content,
-            similarity: r.similarity,
-            category: r.metadata?.category || 'general',
-            source: r.metadata?.source || null
-        }));
+        return results.map(r => {
+            const metadata = r.metadata as any;
+            return {
+                content: r.content,
+                similarity: r.similarity,
+                category: metadata?.category || 'general',
+                source: metadata?.source || null
+            };
+        });
 
     } catch (error: any) {
         console.error('❌ Error searching general financial knowledge:', error);

@@ -10,6 +10,7 @@ import {Avatar, AvatarFallback} from "../ui/avatar.tsx"
 import type {OnboardingData, ScreenProps} from "@/types"
 import {useChat} from "@ai-sdk/react"
 import {DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls} from "ai"
+import ReactMarkdown from "react-markdown"
 
 interface ChatScreenProps extends ScreenProps {
     onboardingData?: OnboardingData
@@ -122,12 +123,53 @@ export function ChatScreen({onStateChange, onboardingData, userEmail}: ChatScree
                                                         : "bg-muted text-muted-foreground rounded-bl-md"
                                                 }`}
                                             >
-                                                <p className="leading-relaxed">
+                                                <div className="leading-relaxed prose prose-sm max-w-none dark:prose-invert prose-p:m-0 prose-p:leading-relaxed">
                                                     {message.parts?.map((part, index) =>
-                                                        part.type === 'text' ? <span
-                                                            key={index}>{part.text}</span> : null
+                                                        part.type === 'text' ? (
+                                                            <ReactMarkdown
+                                                                key={index}
+                                                                components={{
+                                                                    // Customize blockquote styling for citations
+                                                                    blockquote: ({children}) => (
+                                                                        <blockquote className="border-l-4 border-primary/30 bg-muted/30 pl-4 py-2 my-3 italic rounded-r-lg">
+                                                                            {children}
+                                                                        </blockquote>
+                                                                    ),
+                                                                    // Style strong text (bold)
+                                                                    strong: ({children}) => (
+                                                                        <strong className="font-bold text-primary">
+                                                                            {children}
+                                                                        </strong>
+                                                                    ),
+                                                                    // Style em text (italic)
+                                                                    em: ({children}) => (
+                                                                        <em className="italic text-muted-foreground">
+                                                                            {children}
+                                                                        </em>
+                                                                    ),
+                                                                    // Style paragraphs
+                                                                    p: ({children}) => (
+                                                                        <p className="mb-2 last:mb-0">
+                                                                            {children}
+                                                                        </p>
+                                                                    ),
+                                                                    // Style lists
+                                                                    ul: ({children}) => (
+                                                                        <ul className="list-disc list-inside mb-2 space-y-1">
+                                                                            {children}
+                                                                        </ul>
+                                                                    ),
+                                                                    // Style horizontal rules
+                                                                    hr: () => (
+                                                                        <hr className="border-border my-4" />
+                                                                    )
+                                                                }}
+                                                            >
+                                                                {part.text}
+                                                            </ReactMarkdown>
+                                                        ) : null
                                                     )}
-                                                </p>
+                                                </div>
                                             </div>
 
                                             <span
