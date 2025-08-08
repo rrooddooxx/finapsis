@@ -1,0 +1,18 @@
+{
+  "name": "telegram-bot",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "dev:worker": "bun run --hot src/workers/reminder.worker.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "grammy": "^1.37.0",
+    "bullmq": "^5.56.9"
+  }
+}
