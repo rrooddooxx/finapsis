@@ -67,7 +67,8 @@ export class TransactionConfirmationService {
     processingLogId: string, 
     userId: string,
     confirmed: boolean,
-    userMessage?: string
+    userMessage?: string,
+    transactionData?: any
   ): Promise<ConfirmationResponse> {
     
     devLogger('TransactionConfirmationService', `📝 Processing confirmation response - User: ${userId}, Confirmed: ${confirmed}, Job: ${confirmationJobId}`);
@@ -79,7 +80,8 @@ export class TransactionConfirmationService {
         processingLogId,
         userId,
         confirmed,
-        userMessage
+        userMessage,
+        transactionData: transactionData // Include transaction data if provided
       };
 
       // Queue the response processing
@@ -131,8 +133,39 @@ export class TransactionConfirmationService {
     
     devLogger('TransactionConfirmationService', `💾 Storing confirmed transaction - User ID: ${userId}, Amount: ${transactionData.currency} ${transactionData.amount}`);
     devLogger('TransactionConfirmationService', `🔍 User ID type: ${typeof userId}, Length: ${userId.length}, Is UUID format: ${/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)}`);
+    devLogger('TransactionConfirmationService', `🔍 Transaction data validation:`, {
+      documentId: transactionData.documentId,
+      transactionType: transactionData.transactionType,
+      category: transactionData.category,
+      amount: transactionData.amount,
+      currency: transactionData.currency,
+      transactionDate: transactionData.transactionDate,
+      transactionDateType: typeof transactionData.transactionDate,
+      description: transactionData.description,
+      merchant: transactionData.merchant,
+      confidence: transactionData.confidence
+    });
 
     try {
+      // Validate required fields before attempting to store
+      if (!userId || typeof userId !== 'string') {
+        throw new Error(`Invalid userId: ${userId}`);
+      }
+      
+      if (!transactionData.documentId) {
+        throw new Error(`Missing documentId`);
+      }
+      
+      if (!transactionData.transactionDate) {
+        throw new Error(`Missing transactionDate`);
+      }
+      
+      if (!transactionData.amount || isNaN(transactionData.amount)) {
+        throw new Error(`Invalid amount: ${transactionData.amount}`);
+      }
+      
+      devLogger('TransactionConfirmationService', `✅ Validation passed, creating transaction`);
+      
       const transaction = await financialTransactionRepository.create({
         userId: userId,
         documentId: transactionData.documentId,

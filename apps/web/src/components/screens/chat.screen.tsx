@@ -46,47 +46,39 @@ export function ChatScreen({
   // Handle real-time system messages (file upload confirmations, transaction confirmations)
   const handleRealtimeMessage = useCallback((realtimeMessage: any) => {
     console.log('🎯 ChatScreen received real-time message:', realtimeMessage);
-    console.log('🎯 Current messages before adding:', messages.length);
-    console.log('🎯 Message structure:', {
-      id: realtimeMessage.id,
-      role: realtimeMessage.role,
-      content: realtimeMessage.content,
-      createdAt: realtimeMessage.createdAt
+    console.log('🎯 Full message object:', JSON.stringify(realtimeMessage, null, 2));
+    
+    // Use setMessages to check for duplicates with current state and add message
+    setMessages((currentMessages) => {
+      console.log('🎯 Current messages before adding:', currentMessages.length);
+      
+      // Check if message already exists to prevent duplicates
+      const exists = currentMessages.some(msg => msg.id === realtimeMessage.id);
+      if (exists) {
+        console.log('⚠️ Message already exists, skipping:', realtimeMessage.id);
+        return currentMessages;
+      }
+      
+      // Create the message with the correct structure for @ai-sdk/react
+      const formattedMessage = {
+        id: realtimeMessage.id,
+        role: 'assistant' as const,
+        content: realtimeMessage.content,
+        createdAt: realtimeMessage.createdAt || new Date(),
+      };
+      
+      console.log('🚀 Adding new message to state:', JSON.stringify(formattedMessage, null, 2));
+      console.log('🚀 Current messages count before add:', currentMessages.length);
+      
+      const newMessages = [...currentMessages, formattedMessage];
+      console.log('🚀 New messages count after add:', newMessages.length);
+      
+      // Auto-scroll to show the new system message
+      setTimeout(() => scrollToBottom(), 100);
+      
+      return newMessages;
     });
-    
-    // Ensure the message has the correct structure for @ai-sdk/react with parts
-    const formattedMessage = {
-      id: realtimeMessage.id,
-      role: realtimeMessage.role as 'assistant',
-      content: realtimeMessage.content,
-      createdAt: realtimeMessage.createdAt || new Date(),
-      // Add parts structure that the rendering expects
-      parts: [
-        {
-          type: 'text' as const,
-          text: realtimeMessage.content,
-        }
-      ]
-    };
-    
-    // Check if message already exists to prevent duplicates
-    const exists = messages.some(msg => msg.id === formattedMessage.id);
-    if (exists) {
-      console.log('⚠️ Message already exists, skipping:', formattedMessage.id);
-      return;
-    }
-    
-    // Use append method from useChat to add the message properly
-    console.log('🚀 Using append to add message:', formattedMessage);
-    append({
-      role: 'assistant',
-      content: realtimeMessage.content,
-      id: realtimeMessage.id,
-    });
-    
-    // Auto-scroll to show the new system message
-    setTimeout(() => scrollToBottom(), 200);
-  }, []); // Remove setMessages dependency to prevent issues
+  }, [setMessages]);
 
   // Set up real-time chat connection
   const { isConnected } = useRealtimeChat({
@@ -197,8 +189,10 @@ export function ChatScreen({
           <ScrollArea className="flex-1 p-4 sm:p-6">
             <div className="space-y-4">
               {messages.map((message) => {
+                // Skip empty assistant messages (but allow realtime messages with content)
                 if (
                   message.role === "assistant" &&
+                  !message.content && // Allow messages with direct content (realtime)
                   (!message.parts ||
                     message.parts.length === 0 ||
                     !message.parts.some(
@@ -246,10 +240,55 @@ export function ChatScreen({
                         }`}
                       >
                         <div className="leading-relaxed prose prose-sm max-w-none dark:prose-invert prose-p:m-0 prose-p:leading-relaxed">
-                          {message.parts?.map((part, index) =>
-                            part.type === "text" ? (
+                          {message.parts ? (
+                            // Render AI SDK messages with parts
+                            message.parts.map((part, index) =>
+                              part.type === "text" ? (
+                                <ReactMarkdown
+                                  key={index}
+                                  components={{
+                                    // Customize blockquote styling for citations
+                                    blockquote: ({ children }) => (
+                                      <blockquote className="border-l-4 border-primary/30 bg-muted/30 pl-4 py-2 my-3 italic rounded-r-lg">
+                                        {children}
+                                      </blockquote>
+                                    ),
+                                    // Style strong text (bold)
+                                    strong: ({ children }) => (
+                                      <strong className="font-bold text-primary">
+                                        {children}
+                                      </strong>
+                                    ),
+                                    // Style em text (italic)
+                                    em: ({ children }) => (
+                                      <em className="italic text-muted-foreground">
+                                        {children}
+                                      </em>
+                                    ),
+                                    // Style paragraphs
+                                    p: ({ children }) => (
+                                      <p className="mb-2 last:mb-0">{children}</p>
+                                    ),
+                                    // Style lists
+                                    ul: ({ children }) => (
+                                      <ul className="list-disc list-inside mb-2 space-y-1">
+                                        {children}
+                                      </ul>
+                                    ),
+                                    // Style horizontal rules
+                                    hr: () => (
+                                      <hr className="border-border my-4" />
+                                    ),
+                                  }}
+                                >
+                                  {part.text}
+                                </ReactMarkdown>
+                              ) : null
+                            )
+                          ) : (
+                            // Render realtime messages with direct content
+                            message.content && (
                               <ReactMarkdown
-                                key={index}
                                 components={{
                                   // Customize blockquote styling for citations
                                   blockquote: ({ children }) => (
@@ -285,9 +324,9 @@ export function ChatScreen({
                                   ),
                                 }}
                               >
-                                {part.text}
+                                {message.content}
                               </ReactMarkdown>
-                            ) : null
+                            )
                           )}
                         </div>
                       </div>

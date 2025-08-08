@@ -56,7 +56,11 @@ export class FinancialTransactionRepository {
         .insert(financialTransactions)
         .values({
           ...transaction,
-          transactionDate: transaction.transactionDate
+          transactionDate: typeof transaction.transactionDate === 'string' 
+            ? new Date(transaction.transactionDate) 
+            : (transaction.transactionDate instanceof Date 
+                ? transaction.transactionDate 
+                : new Date())
         })
         .returning();
 

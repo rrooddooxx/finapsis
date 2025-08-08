@@ -1,5 +1,6 @@
 import { devLogger } from "../../utils/logger.utils";
 import type { CoreMessage } from "ai";
+import { pendingConfirmationsStore } from "../assistant-financial-documents/pending-confirmations.store";
 
 export interface AsyncChatMessage {
   userId: string;
@@ -167,6 +168,9 @@ export class AsyncChatMessageService {
     processingLogId: string,
     transactionData: any
   ): Promise<void> {
+    // Store the pending confirmation for later retrieval
+    pendingConfirmationsStore.addPendingConfirmation(userId, processingLogId, transactionData);
+    
     await this.sendMessageToUser({
       userId,
       message: confirmationMessage,

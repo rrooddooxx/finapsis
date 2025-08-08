@@ -103,9 +103,56 @@ export class DocumentAnalyzerService {
                 featureCount: analyzeDocumentDetails.features?.length
             });
 
-            const response = await this.aiDocumentClient.analyzeDocument({
-                analyzeDocumentDetails
-            });
+            // Implement timeout-based fallback since OCI SDK handles retries internally
+            const timeoutMs = 30000; // 30 seconds timeout
+            let response: any = null;
+            
+            try {
+                devLogger(`DocumentAnalyzer`, `🔄 Starting OCI Document AI analysis with ${timeoutMs/1000}s timeout`);
+                
+                response = await Promise.race([
+                    this.aiDocumentClient.analyzeDocument({
+                        analyzeDocumentDetails
+                    }),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('OCI Document AI timeout')), timeoutMs)
+                    )
+                ]);
+                
+                devLogger(`DocumentAnalyzer`, `✅ OCI Document AI completed successfully`);
+                
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                devLogger(`DocumentAnalyzer`, `❌ OCI Document AI failed or timed out: ${errorMessage}`);
+                devLogger(`DocumentAnalyzer`, `💀 Skipping OCI Document AI, continuing with OpenAI Vision fallback`);
+                
+                // Return a fallback response that indicates OCR failed but allows processing to continue
+                return {
+                    status: 'completed',
+                    extractedData: {
+                        text: '', // Empty text - next steps will use OpenAI Vision instead
+                        tables: [],
+                        keyValues: [],
+                        financialData: {
+                            amounts: [],
+                            dates: [],
+                            categories: [],
+                            merchant: null
+                        },
+                        documentClassification: {
+                            documentType: 'OTHERS',
+                            confidence: 0,
+                            categories: [],
+                            language: 'es'
+                        },
+                        metadata: {
+                            ociAnalysisFailed: true,
+                            failureReason: errorMessage.includes('timeout') ? 'OCI Document AI timeout' : 'OCI Document AI error',
+                            extractedAt: new Date().toISOString()
+                        }
+                    }
+                };
+            }
 
             devLogger("🎉 OCI Document AI response:", JSON.stringify(response, null, 2));
 

@@ -199,7 +199,7 @@ export const financial_transactions = pgTable("financial_transactions", {
 	subcategory: varchar("subcategory", { length: 100 }),
 	amount: numeric("amount", { precision: 15, scale:  2 }).notNull(),
 	currency: varchar("currency", { length: 3 }).default('CLP'::character varying).notNull(),
-	transaction_date: timestamp("transaction_date", { mode: 'string' }).notNull(),
+	transaction_date: timestamp("transaction_date").notNull(),
 	description: text("description").notNull(),
 	merchant: varchar("merchant", { length: 255 }),
 	confidence_score: numeric("confidence_score", { precision: 3, scale:  2 }),
