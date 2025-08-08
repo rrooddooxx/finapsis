@@ -17,7 +17,6 @@
         "bullmq": "^5.56.9",
         "drizzle-orm": "^0.31.2",
         "drizzle-zod": "^0.5.1",
-        "bullmq": "^5.56.9",
         "hono": "^4.8.9",
         "oci-aidocument": "^2.114.1",
         "oci-aivision": "^2.114.1",
@@ -1028,8 +1027,6 @@
     "oci-objectstorage": ["oci-objectstorage@2.114.1", "", { "dependencies": { "await-semaphore": "^0.1.3", "oci-common": "2.114.1", "oci-workrequests": "2.114.1" } }, "sha512-W9CV+pEQHUXOW7uadEQwbcP4MND8LlvPiMarIyUtRObm03ieWr+6HtfA7uIoUYz5lBysWxl/qsxIOcrfhBJKvA=="],
     
     "oci-nosql": ["oci-nosql@2.114.1", "", { "dependencies": { "oci-common": "2.114.1", "oci-workrequests": "2.114.1" } }, "sha512-7b89GwTpnbhQrWGy6mrJB5fenXPHdxE3HdM9WSPnlNNkxRxG/Lq/DCT2iJTUGFBrJF3s4UJaxJb5Eo0ZXhnvtw=="],
-
-    "oci-objectstorage": ["oci-objectstorage@2.114.1", "", { "dependencies": { "await-semaphore": "^0.1.3", "oci-common": "2.114.1", "oci-workrequests": "2.114.1" } }, "sha512-W9CV+pEQHUXOW7uadEQwbcP4MND8LlvPiMarIyUtRObm03ieWr+6HtfA7uIoUYz5lBysWxl/qsxIOcrfhBJKvA=="],
 
     "oci-oce": ["oci-oce@2.114.1", "", { "dependencies": { "oci-common": "2.114.1", "oci-workrequests": "2.114.1" } }, "sha512-EdTd0Sz28loqX6+BkJufr+aU3sToZo11N5dO6Zp5E1fitnIQgmAJqCIndbTR5WVogSoiKaS3y2h0sCd4C1graA=="],
 
