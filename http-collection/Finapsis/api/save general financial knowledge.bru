@@ -1,0 +1,23 @@
+meta {
+  name: save general financial knowledge
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:3000/api/knowledge/embed
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "content": "Ahorra al menos 300 pesos diarios en una alcancia en forma de Chanchito, funciona 100%",
+      "category": "ahorro",
+      "source": "Pepito Palotes"
+  }
+}
+
+settings {
+  encodeUrl: true
+}
