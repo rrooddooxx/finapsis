@@ -83,6 +83,8 @@ export const createReminderAction = async ({ userMessage, userId }: ReminderExtr
         removeOnFail: 5, // Solo guardar los últimos 5 fallidos
       }
     );
+
+    console.log(`✅ Recordatorio programado para ${new Date(reminderData.when.timestamp).toLocaleString('es-ES')}`)
     
     return {
       success: true,

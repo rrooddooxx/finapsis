@@ -13,7 +13,8 @@ export const reminderWorker = new Worker(
     console.log(`📋 Procesando recordatorio ${job.id} para usuario ${userId}`);
 
     try {
-      const telegramUsername = Bun.env.TELEGRAM_BOT_USERNAME || '@ponytakxn'
+      const telegramUsername = Bun.env.TELEGRAM_BOT_USERNAME || 8134546836
+      console.log(telegramUsername)
 
       const formattedMessage = formatMessage(message, scheduledFor, isRecurring)
 
@@ -35,12 +36,14 @@ export const reminderWorker = new Worker(
   },
   {
     connection: {
-      host: process.env.REDIS_HOST,
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
+      host: Bun.env.REDIS_HOST || '127.0.0.1',
+      port: parseInt(Bun.env.REDIS_PORT || '6379'),
+      password: Bun.env.REDIS_PASSWORD,
     },
     concurrency: 5,
     removeOnComplete: { count: 20 },
     removeOnFail: { count: 10 },
   }
 )
+
+console.log('🧵 Reminder worker inicializado y escuchando la cola "reminders"')
