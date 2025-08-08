@@ -27,7 +27,7 @@ export class DocumentUploadService {
                 bucketName: config.bucketName,
                 objectName: objectName,
                 contentLength: fileBuffer.length,
-                putObjectBody: this.bufferToStream(fileBuffer),
+                putObjectBody: fileBuffer, // Pass the buffer directly
                 contentType: contentType,
             };
 
@@ -43,13 +43,6 @@ export class DocumentUploadService {
             devLogger('DocumentUploadService', 'Error uploading document', error);
             throw new Error(`Failed to upload document: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-    }
-
-    private bufferToStream(buffer: Buffer): Readable {
-        const stream = new Readable();
-        stream.push(buffer);
-        stream.push(null);
-        return stream;
     }
 }
 

@@ -1,0 +1,27 @@
+meta {
+  name: upload file
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{API_HOST}}/api/files/upload
+  body: file
+  auth: inherit
+}
+
+headers {
+  X-File-Name: Boleta_763387.pdf
+}
+
+body:multipart-form {
+  file: /Users/sebastiankravetz/Downloads/comprobante 2.jpeg
+}
+
+body:file {
+  file: @file(/Users/sebastiankravetz/Downloads/Boleta_763387.pdf) @contentType(application/pdf)
+}
+
+settings {
+  encodeUrl: true
+}
