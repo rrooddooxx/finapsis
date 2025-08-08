@@ -1,0 +1,32 @@
+meta {
+  name: upload file from telegram
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{API_HOST}}/api/files/upload-messaging
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+   "fileUrl": "https://elalmacen.cl/software-de-punto-de-venta/mejor/wp-content/uploads/2021/05/Boleta-e.jpeg",
+  "chatId": "987654321",
+  "uploadAt": "2025-08-08T12:00:00Z",
+  "telegramUser": "testuser"
+  }
+}
+
+body:multipart-form {
+  file: /Users/sebastiankravetz/Downloads/comprobante 2.jpeg
+}
+
+settings {
+  encodeUrl: true
+}

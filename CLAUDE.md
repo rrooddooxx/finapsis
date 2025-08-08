@@ -442,3 +442,173 @@ describe('OCI Provider', () => {
 5. **Future Proof**: Easy to add OpenAI/Anthropic later
 
 Remember: The custom OCI provider is the key to leveraging Oracle Cloud credits while maintaining the excellent DX of Vercel AI SDK. Focus on getting this working early in the hackathon!
+- add to memory all the relevant updates from this last tasks
+- This session is being continued from a previous conversation that ran out of context. The conversation is summarized below:
+  Analysis:
+  Analyzing the conversation chronologically:
+
+  1. **Initial Request**: User wanted to fix errors classifying "expenses" vs "incomes" and implement full PDF to base64 conversion for OpenAI Vision API. They also 
+  wanted to separate processing flows for expense vs income documents.
+
+  2. **First Major Fix**: I addressed Redis eviction policy issues and enhanced error logging for OCI Document AI failures.
+
+  3. **PDF Conversion Implementation**: I installed pdf2pic, added GraphicsMagick and Ghostscript dependencies to Docker, and created a comprehensive PDF to base64 
+  conversion system with fallback mechanisms.
+
+  4. **Document Type Classification**: I created a new service to classify documents as EXPENSE or INCOME before main processing, using OpenAI Vision API.
+
+  5. **Split Processing Flows**: I implemented separate processing paths for expense vs income documents with specialized categorization logic.
+
+  6. **Category Enhancement**: User requested more specific categories like "electronics", "food" etc. instead of generic "compras". I updated the classification to 
+  return subcategories as main categories.
+
+  7. **Configuration Fixes**: I removed outputLocation from OCI requests, fixed document type mapping (added "boleta" -> "RECEIPT"), and enhanced error logging.
+
+  8. **Recent Issue**: User reported that PDF processing works but JPEG images fail with OpenAI Vision API schema validation errors. The error shows "No object 
+  generated: response did not match schema" for the VisionAnalysisSchema.
+
+  Key technical patterns include:
+  - Multi-layered fallback systems (pdf2pic -> pdf-poppler -> enhanced LLM)
+  - Comprehensive error logging with OCI SDK specific details
+  - Schema validation improvements with default values and better constraints
+  - Parallel processing (OCI Document AI + OpenAI Vision + OpenAI LLM)
+  - Document type routing (EXPENSE vs INCOME flows)
+
+  The most recent work was identifying that OpenAI Vision API has the same schema validation issue that was previously fixed in the document type classifier.
+
+  Summary:
+  1. Primary Request and Intent:
+     - Fix errors in classifying "expenses" vs "incomes" by creating separate processing flows
+     - Implement full PDF to base64 conversion for OpenAI Vision API integration
+     - Add OpenAI Vision API support for JPEG/JPG/PNG images sent as base64
+     - Create more specific transaction categories (electronics, food, etc.) instead of generic ones like "compras"
+     - Ensure Oracle Object Storage integration works properly with document processing pipeline
+     - Fix Redis eviction policy issues for BullMQ job queue reliability
+
+  2. Key Technical Concepts:
+     - Oracle Cloud Infrastructure (OCI) Document AI for OCR and text extraction
+     - OpenAI Vision API for image analysis with base64 encoding
+     - BullMQ job queue with Redis for asynchronous processing
+     - PDF conversion using pdf2pic, GraphicsMagick, and Ghostscript
+     - Multi-agent document processing pipeline with parallel analysis
+     - Zod schema validation for structured AI responses
+     - Docker containerization with Alpine Linux
+     - Chilean financial document context and patterns
+
+  3. Files and Code Sections:
+
+     - **docker-compose.yaml**
+       - Fixed Redis eviction policy from `allkeys-lru` to `noeviction`
+       - Critical for preventing BullMQ job loss under memory pressure
+       - ```yaml
+         command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+         ```
+
+     - **apps/api/Dockerfile**
+       - Added PDF conversion dependencies for both build and production stages
+       - ```dockerfile
+         RUN apk add --no-cache graphicsmagick ghostscript poppler-utils
+         ```
+
+     - **document-type-classifier.service.ts** (newly created)
+       - Implements first-stage classification to determine EXPENSE vs INCOME
+       - Uses OpenAI Vision API with Chilean-optimized prompts
+       - ```typescript
+         const DocumentTypeSchema = z.object({
+           documentType: z.enum(['EXPENSE', 'INCOME']),
+           confidence: z.number().min(0).max(1),
+           reasoning: z.string().min(10),
+           suggestedCategory: z.string().default("general"),
+           merchant: z.string().default("unknown")
+         });
+         ```
+
+     - **document-converter.service.ts**
+       - Implemented comprehensive PDF to base64 conversion with dual fallback system
+       - ```typescript
+         private async convertPdfToBase64Images(pdfBuffer: Buffer, fileName: string): Promise<Array<{base64: string, mimeType: string, fileName?: string}>> {
+           // pdf2pic primary conversion
+           // pdf-poppler fallback conversion
+           // Returns base64 encoded PNG images
+         }
+         ```
+
+     - **document-processing-orchestrator.service.ts**
+       - Added document type classification as Stage 0 before OCR
+       - Implemented split processing flows for EXPENSE vs INCOME
+       - ```typescript
+         if (detectedTransactionType === 'EXPENSE') {
+           classificationResult = await this.processExpenseDocument(/* ... */);
+         } else {
+           classificationResult = await this.processIncomeDocument(/* ... */);
+         }
+         ```
+
+     - **financial-transaction-classifier.service.ts**
+       - Updated to return subcategories as main categories for specificity
+       - ```typescript
+         return {
+           category: bestMatch.subcategory || bestMatch.category,
+           subcategory: bestMatch.subcategory,
+           // ...
+         };
+         ```
+
+     - **openai-vision.service.ts**
+       - Updated categories to include specific types like "electronica"
+       - Schema validation issue identified but not yet fixed
+       - ```typescript
+         const VisionAnalysisSchema = z.object({
+           extractedText: z.string().describe("Complete text extracted from the image"),
+           amounts: z.array(z.number()).describe("All numeric amounts found in the document"),
+           // ... other fields
+         });
+         ```
+
+  4. Errors and fixes:
+     - **Redis Eviction Policy Error**: Fixed `allkeys-lru` to `noeviction` in docker-compose files to prevent BullMQ job loss
+     - **PDF Conversion Failures**: Added GraphicsMagick and Ghostscript dependencies, created fallback system with pdf-poppler
+     - **OCI Document AI `[object Object]` Errors**: Enhanced error logging with `extractOCIErrorDetails()` method to show actual error information
+     - **Document Type Misclassification**: Added "boleta" to type mapping, created separate EXPENSE/INCOME processing flows
+     - **Generic Categories Issue**: Modified classifier to return specific subcategories as main categories
+     - **Schema Validation Failures**: Fixed document type classifier schema with better defaults and constraints
+     - **JPEG Processing Failure**: Identified OpenAI Vision schema validation error (current issue)
+
+  5. Problem Solving:
+     - Implemented multi-layered PDF conversion fallback system
+     - Created parallel processing architecture (OCI + OpenAI Vision + OpenAI LLM)
+     - Built comprehensive error logging system for OCI SDK
+     - Designed Chilean-specific document recognition patterns
+     - Established separate processing pipelines for different transaction types
+
+  6. All user messages:
+     - Initial request to separate expense/income flows and implement PDF to base64 conversion
+     - Request to fix Redis eviction policy in Docker Compose for all environments
+     - Feedback that PDF processing works but JPEG images fail with OpenAI Vision API
+     - Clarification that there's no results bucket, only upload bucket with streaming events
+     - Request to make categories more specific like "electronics", "food" vs generic "compras"
+
+  7. Pending Tasks:
+     - Fix OpenAI Vision API schema validation error for JPEG image processing
+     - Complete schema validation improvements similar to document type classifier fixes
+
+  8. Current Work:
+     The most recent work involved identifying and beginning to fix an OpenAI Vision API schema validation error. The user reported that PDF processing works correctly,
+   but JPEG images fail with the error:
+     ```
+     OpenAI Vision ❌ Image analysis failed {
+       error: "No object generated: response did not match schema.",
+       processingTime: 7349,
+     }
+     ```
+     
+     I had just identified that this is the same type of schema validation issue that was previously fixed in the document type classifier service, but it's now 
+  occurring in the OpenAI Vision service's `VisionAnalysisSchema`.
+
+  9. Optional Next Step:
+     Fix the OpenAI Vision API schema validation error by applying the same improvements made to the document type classifier: add default values, better constraints, 
+  and more flexible schema validation to the `VisionAnalysisSchema` in `openai-vision.service.ts`.
+
+     Direct quote from conversation: "I can see the issue now. The system is working great overall, but there's a specific problem with the OpenAI Vision API when 
+  processing JPEG images. The error shows: 'OpenAI Vision ❌ Image analysis failed { error: "No object generated: response did not match schema." }'".
+  Please continue the conversation from where we left it off without asking the user any further questions. Continue with the last task that you were asked to work on.
