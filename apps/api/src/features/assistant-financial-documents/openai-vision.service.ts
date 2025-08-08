@@ -218,15 +218,16 @@ INSTRUCCIONES DE ANÁLISIS:
 7. Calcula el monto principal de la transacción (usualmente el TOTAL)
 
 CATEGORÍAS CHILENAS:
-- alimentación (supermercados, restaurants)
-- transporte (combustible, transporte público, Uber)
-- salud (farmacias, consultas médicas)
-- educación (colegios, universidades)
-- servicios_básicos (luz, agua, gas, internet)
-- entretenimiento (cine, eventos)
-- vestimenta (ropa, calzado)
-- hogar (muebles, electrodomésticos)
-- servicios_financieros (bancos, seguros)
+- alimentacion (supermercados, restaurantes, comida)
+- electronica (computadores, celulares, TV, tablets, tarjetas SD, accesorios tech)
+- transporte (combustible, transporte público, Uber, taxi)
+- salud (farmacias, consultas médicas, medicamentos)
+- educacion (colegios, universidades, libros, cursos)
+- servicios_basicos (luz, agua, gas, internet, telefonía)
+- entretenimiento (cine, eventos, streaming, juegos)
+- vestimenta (ropa, calzado, accesorios)
+- hogar (muebles, electrodomésticos, decoración)
+- servicios_financieros (bancos, seguros, créditos)
 - otros_gastos (misceláneos)
 
 Responde con la máxima precisión posible, especialmente para el contexto chileno.

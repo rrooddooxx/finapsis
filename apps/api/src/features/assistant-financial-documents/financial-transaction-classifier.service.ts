@@ -259,7 +259,8 @@ export class FinancialTransactionClassifier {
     }
 
     return {
-      category: bestMatch.category,
+      // Use subcategory as main category if found (more specific), otherwise use main category
+      category: bestMatch.subcategory || bestMatch.category,
       subcategory: bestMatch.subcategory,
       reasoning: bestMatch.reasoning,
       matchedKeywords: bestMatch.matchedKeywords,

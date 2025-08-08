@@ -95,6 +95,14 @@ export class DocumentAnalyzerService {
 
             devLogger("🔄 OCI Document AI request payload:", JSON.stringify(analyzeDocumentDetails, null, 2));
 
+            // Add debug info about the client configuration
+            devLogger("🔧 OCI Document AI client config:", {
+                compartmentId: analyzeDocumentDetails.compartmentId,
+                documentType: analyzeDocumentDetails.documentType,
+                language: analyzeDocumentDetails.language,
+                featureCount: analyzeDocumentDetails.features?.length
+            });
+
             const response = await this.aiDocumentClient.analyzeDocument({
                 analyzeDocumentDetails
             });
@@ -144,31 +152,68 @@ export class DocumentAnalyzerService {
             };
 
         } catch (error) {
-            // Enhanced error logging to debug OCI API issues
-            let errorDetails: any = {
-                message: error instanceof Error ? error.message : String(error),
-                type: error?.constructor?.name || 'UnknownError'
-            };
-
-            // If it's an OCI SDK error, try to extract more details
-            if (typeof error === 'object' && error !== null) {
-                errorDetails = {
-                    ...errorDetails,
-                    statusCode: (error as any).statusCode,
-                    code: (error as any).code,
-                    opcRequestId: (error as any).opcRequestId,
-                    targetService: (error as any).targetService,
-                    operationName: (error as any).operationName
-                };
-            }
-
+            // Enhanced error logging for OCI SDK issues
+            const errorDetails = this.extractOCIErrorDetails(error);
             devLogger("❌ OCI Document AI error details:", JSON.stringify(errorDetails, null, 2));
 
             return {
                 status: 'failed',
-                error: error instanceof Error ? error.message : String(error)
+                error: errorDetails.message || 'OCI Document AI request failed'
             };
         }
+    }
+
+    /**
+     * Extract detailed error information from OCI SDK errors
+     */
+    private extractOCIErrorDetails(error: unknown): any {
+        const details: any = {
+            timestamp: new Date().toISOString(),
+            type: error?.constructor?.name || 'UnknownError'
+        };
+
+        if (error instanceof Error) {
+            details.message = error.message;
+            details.stack = error.stack;
+        } else {
+            details.message = String(error);
+        }
+
+        // OCI SDK specific error properties
+        if (typeof error === 'object' && error !== null) {
+            const ociError = error as any;
+            
+            // Common OCI error properties
+            details.statusCode = ociError.statusCode;
+            details.code = ociError.code;
+            details.opcRequestId = ociError.opcRequestId;
+            details.targetService = ociError.targetService;
+            details.operationName = ociError.operationName;
+            details.cause = ociError.cause;
+            
+            // Try to extract response body if available
+            if (ociError.response) {
+                details.response = {
+                    status: ociError.response.status,
+                    statusText: ociError.response.statusText,
+                    headers: ociError.response.headers
+                };
+                
+                // Try to extract response body
+                if (ociError.response.data) {
+                    details.responseData = ociError.response.data;
+                }
+            }
+            
+            // Extract any other enumerable properties
+            for (const key of Object.keys(ociError)) {
+                if (!details.hasOwnProperty(key) && key !== 'stack') {
+                    details[key] = ociError[key];
+                }
+            }
+        }
+
+        return details;
     }
 
     async getAnalysisResult(jobId: string): Promise<DocumentAnalysisResult> {

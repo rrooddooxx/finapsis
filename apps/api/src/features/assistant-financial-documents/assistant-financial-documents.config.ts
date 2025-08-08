@@ -223,6 +223,7 @@ class FinancialDocumentsConfiguration {
                 typeMapping: {
                     'receipt': 'RECEIPT',
                     'recibo': 'RECEIPT',
+                    'boleta': 'RECEIPT',
                     'invoice': 'INVOICE',
                     'factura': 'INVOICE',
                     'bank': 'BANK_STATEMENT',

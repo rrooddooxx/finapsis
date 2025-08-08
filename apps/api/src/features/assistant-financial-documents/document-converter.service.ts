@@ -3,6 +3,7 @@ import { ociProviderService } from "../../providers/oci/oci-provider.service";
 import { financialDocumentsConfig } from "./assistant-financial-documents.config";
 import { pdfConverterService } from "./pdf-converter.service";
 const pdf2pic = require("pdf2pic");
+const pdfPoppler = require("pdf-poppler");
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -296,36 +297,70 @@ export class DocumentConverterService {
 
       devLogger('DocumentConverter', `🔄 Converting PDF: ${fileName} (${Math.round(pdfBuffer.length / 1024)}KB)`);
 
-      // Configure pdf2pic
+      // Configure pdf2pic with explicit GraphicsMagick path and Ghostscript support
       const convert = pdf2pic.fromPath(tempPdfPath, {
-        density: 300,           // DPI for better quality
+        density: 150,           // Lower DPI for faster processing and compatibility
         saveFilename: 'page',
         savePath: tempDir,
         format: 'png',
-        width: 2000,
-        height: 2000,
-        quality: 85
+        width: 1200,           // Smaller size for better compatibility
+        height: 1600,
+        quality: 75,
+        graphicsMagick: true   // Use GraphicsMagick instead of ImageMagick
       });
 
-      // Convert all pages to images
-      const conversionResults = await convert.bulk(-1, { responseType: 'buffer' });
+      let imageData: Array<{base64: string, mimeType: string, fileName?: string}>;
       
-      devLogger('DocumentConverter', `✅ PDF converted to ${conversionResults.length} pages`);
+      try {
+        // Try pdf2pic first
+        const conversionResults = await convert.bulk(-1, { responseType: 'buffer' });
+        devLogger('DocumentConverter', `✅ PDF converted with pdf2pic - ${conversionResults.length} pages`);
 
-      // Convert each page to base64
-      const imageData = conversionResults.map((result: any, index: number) => {
-        const imageBuffer = result.buffer;
-        if (!imageBuffer) {
-          throw new Error(`Failed to get buffer for page ${index + 1}`);
-        }
+        // Convert each page to base64
+        imageData = conversionResults.map((result: any, index: number) => {
+          const imageBuffer = result.buffer;
+          if (!imageBuffer) {
+            throw new Error(`Failed to get buffer for page ${index + 1}`);
+          }
 
-        const base64 = imageBuffer.toString('base64');
-        return {
-          base64,
-          mimeType: 'image/png',
-          fileName: `${fileName}_page_${index + 1}.png`
+          const base64 = imageBuffer.toString('base64');
+          return {
+            base64,
+            mimeType: 'image/png',
+            fileName: `${fileName}_page_${index + 1}.png`
+          };
+        });
+
+      } catch (pdf2picError) {
+        devLogger('DocumentConverter', `⚠️ pdf2pic failed, trying pdf-poppler: ${pdf2picError}`);
+        
+        // Fallback to pdf-poppler
+        const popplerOptions = {
+          format: 'png',
+          out_dir: tempDir,
+          out_prefix: 'page',
+          page: null, // Convert all pages
+          scale: 1200 // Width in pixels
         };
-      });
+
+        const popplerResults = await pdfPoppler.convert(tempPdfPath, popplerOptions);
+        devLogger('DocumentConverter', `✅ PDF converted with pdf-poppler - ${popplerResults.length} pages`);
+
+        // Convert poppler results to base64
+        imageData = popplerResults.map((imagePath: string, index: number) => {
+          const imageBuffer = fs.readFileSync(imagePath);
+          const base64 = imageBuffer.toString('base64');
+          
+          // Clean up the poppler-generated file
+          fs.unlinkSync(imagePath);
+          
+          return {
+            base64,
+            mimeType: 'image/png',
+            fileName: `${fileName}_page_${index + 1}.png`
+          };
+        });
+      }
 
       return imageData;
 

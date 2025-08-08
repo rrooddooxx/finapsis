@@ -7,6 +7,7 @@ import { financialTransactionRepository } from "./financial-transaction.reposito
 import { openAIVisionService } from "./openai-vision.service";
 import { documentConverterService } from "./document-converter.service";
 import { analysisMergerService } from "./analysis-merger.service";
+import { documentTypeClassifierService } from "./document-type-classifier.service";
 import { supabase } from "../../providers/supabase";
 import { documentProcessingLogs } from "../../providers/supabase/schema/document-processing-logs";
 import { eq } from "drizzle-orm";
@@ -51,6 +52,25 @@ export class DocumentProcessingOrchestrator {
     const processingLog = await this.createProcessingLog(request, documentId);
 
     try {
+      // Stage 0: Document Type Classification (Expense vs Income)
+      devLogger('DocumentProcessingOrchestrator', '🎯 Starting document type classification (Expense vs Income)');
+      
+      const documentTypeResult = await documentTypeClassifierService.classifyDocumentType({
+        bucketName: request.bucketName,
+        objectName: request.objectName,
+        namespace: request.namespace,
+        userId: request.userId
+      });
+
+      const detectedTransactionType = documentTypeResult.documentType;
+      devLogger('DocumentProcessingOrchestrator', `✅ Document classified as: ${detectedTransactionType} (confidence: ${documentTypeResult.confidence})`);
+
+      // Update processing log with detected type
+      await this.updateProcessingData(processingLog.id, {
+        documentTypeClassification: documentTypeResult,
+        detectedTransactionType
+      });
+
       // Stage 1: OCR and Document Analysis
       await this.updateProcessingStatus(processingLog.id, 'PROCESSING_OCR', 'OCR_EXTRACTION');
       
@@ -128,30 +148,59 @@ export class DocumentProcessingOrchestrator {
 
           devLogger('DocumentProcessingOrchestrator', `✅ Vision analysis completed - Merchant: ${visionAnalysisResult.merchantInfo?.merchantName}, Category: ${visionAnalysisResult.transactionInfo?.category}, Amount: ${visionAnalysisResult.transactionInfo?.amount}, Confidence: ${visionAnalysisResult.confidence}`);
         } else {
-          devLogger('DocumentProcessingOrchestrator', '⚠️ Vision analysis skipped - conversion failed or unsupported format');
+          devLogger('DocumentProcessingOrchestrator', '⚠️ Vision analysis skipped - will use enhanced text classification instead');
+          
+          // Fallback: Use OpenAI LLM to enhance classification with OCR results
+          if (ocrAnalysisResult.status === 'completed' && ocrAnalysisResult.extractedData?.extractedText) {
+            try {
+              visionAnalysisResult = await this.enhanceClassificationWithLLM(
+                ocrAnalysisResult.extractedData.extractedText,
+                request
+              );
+              devLogger('DocumentProcessingOrchestrator', `✅ Enhanced LLM classification - Category: ${visionAnalysisResult.transactionInfo?.category}, Confidence: ${visionAnalysisResult.confidence}`);
+            } catch (error) {
+              devLogger('DocumentProcessingOrchestrator', `⚠️ Enhanced LLM classification failed: ${error}`);
+            }
+          }
         }
       } catch (error) {
         devLogger('DocumentProcessingOrchestrator', `⚠️ Vision analysis failed, continuing with OCR-only processing: ${error}`);
       }
 
-      // Stage 3: Financial Classification
+      // Stage 3: Split Processing Flow Based on Document Type
       await this.updateProcessingStatus(processingLog.id, 'PROCESSING_CLASSIFICATION', 'TEXT_ANALYSIS');
       
-      const classificationResult = await financialTransactionClassifier.classifyTransaction(
-        {
+      let classificationResult;
+      
+      if (detectedTransactionType === 'EXPENSE') {
+        devLogger('DocumentProcessingOrchestrator', '💸 Processing EXPENSE document flow');
+        classificationResult = await this.processExpenseDocument({
           text: ocrAnalysisResult.extractedData.text || '',
           amounts: ocrAnalysisResult.extractedData.financialData?.amounts || [],
           dates: ocrAnalysisResult.extractedData.financialData?.dates || [],
           merchant: ocrAnalysisResult.extractedData.financialData?.merchant,
           tables: ocrAnalysisResult.extractedData.tables,
           keyValuePairs: ocrAnalysisResult.extractedData.keyValues
-        },
-        {
+        }, {
           documentType: ocrAnalysisResult.extractedData.documentClassification?.documentType || request.documentType,
           fileName: request.objectName,
           language: ocrAnalysisResult.extractedData.documentClassification?.language || 'es'
-        }
-      );
+        });
+      } else {
+        devLogger('DocumentProcessingOrchestrator', '💰 Processing INCOME document flow');
+        classificationResult = await this.processIncomeDocument({
+          text: ocrAnalysisResult.extractedData.text || '',
+          amounts: ocrAnalysisResult.extractedData.financialData?.amounts || [],
+          dates: ocrAnalysisResult.extractedData.financialData?.dates || [],
+          merchant: ocrAnalysisResult.extractedData.financialData?.merchant,
+          tables: ocrAnalysisResult.extractedData.tables,
+          keyValuePairs: ocrAnalysisResult.extractedData.keyValues
+        }, {
+          documentType: ocrAnalysisResult.extractedData.documentClassification?.documentType || request.documentType,
+          fileName: request.objectName,
+          language: ocrAnalysisResult.extractedData.documentClassification?.language || 'es'
+        });
+      }
 
       await this.updateProcessingData(processingLog.id, {
         classificationConfidence: classificationResult.confidence
@@ -376,6 +425,189 @@ export class DocumentProcessingOrchestrator {
     if (extractedData.keyValues?.length > 0) confidence += 0.1;
     
     return Math.min(confidence, 1.0);
+  }
+
+  /**
+   * Enhanced classification using OpenAI LLM when vision analysis fails
+   */
+  private async enhanceClassificationWithLLM(extractedText: string, request: DocumentProcessingRequest) {
+    const { generateObject } = await import('ai');
+    const { openai } = await import('@ai-sdk/openai');
+    const { z } = await import('zod');
+
+    // Use the same schema as vision analysis for consistency
+    const LLMClassificationSchema = z.object({
+      extractedText: z.string(),
+      merchantInfo: z.object({
+        merchantName: z.string(),
+        confidence: z.number().min(0).max(1)
+      }),
+      transactionInfo: z.object({
+        transactionType: z.enum(['INCOME', 'EXPENSE']),
+        category: z.string(),
+        amount: z.number(),
+        currency: z.string().default('CLP'),
+        description: z.string(),
+        confidence: z.number().min(0).max(1)
+      }),
+      confidence: z.number().min(0).max(1)
+    });
+
+    const result = await generateObject({
+      model: openai('gpt-4o-mini'),
+      messages: [
+        {
+          role: 'user',
+          content: `Analiza este texto extraído de un documento financiero chileno y clasifica la transacción:
+
+TEXTO EXTRAÍDO:
+${extractedText.substring(0, 2000)} // Limit text length
+
+INSTRUCCIONES:
+1. Identifica el comercio/merchant exactamente
+2. Determina si es INGRESO o GASTO
+3. Clasifica en categorías específicas como: electronica, alimentacion, transporte, salud, etc.
+4. Encuentra el monto principal de la transacción
+5. Usa contexto chileno (nombres de tiendas, RUT, etc.)
+
+CATEGORÍAS ESPECÍFICAS:
+- electronica (PC Factory, Wei, computadores, celulares, tarjetas SD)
+- alimentacion (supermercados, restaurantes)
+- transporte (combustible, Uber, transporte público)
+- salud (farmacias, clínicas)
+- vestimenta (ropa, calzado)
+- hogar (muebles, electrodomésticos)
+- servicios_basicos (luz, agua, gas, internet)
+- entretenimiento (cine, streaming)
+- educacion (libros, cursos)
+- servicios_financieros (bancos, seguros)
+
+Responde con máxima precisión para el contexto chileno.`
+        }
+      ],
+      schema: LLMClassificationSchema,
+      temperature: 0.1
+    });
+
+    // Convert to VisionAnalysisResult format
+    return {
+      success: true,
+      extractedText: result.object.extractedText,
+      amounts: [result.object.transactionInfo.amount],
+      dates: [],
+      merchantInfo: {
+        merchantName: result.object.merchantInfo.merchantName,
+        confidence: result.object.merchantInfo.confidence
+      },
+      transactionInfo: result.object.transactionInfo,
+      chileanContext: {
+        documentType: 'UNKNOWN' as const,
+        isChileanDocument: true,
+        language: 'es' as const,
+        hasRUT: extractedText.includes('-'),
+        hasIVA: extractedText.toLowerCase().includes('iva')
+      },
+      confidence: result.object.confidence,
+      processingTime: 0
+    };
+  }
+
+  /**
+   * Specialized processing for EXPENSE documents
+   */
+  private async processExpenseDocument(extractedData: any, context: any) {
+    devLogger('DocumentProcessingOrchestrator', '💸 Using expense-specific classification logic');
+    
+    // Force transaction type to EXPENSE and use standard classification
+    const classificationResult = await financialTransactionClassifier.classifyTransaction(
+      extractedData,
+      context
+    );
+
+    // Ensure it's marked as expense
+    return {
+      ...classificationResult,
+      transactionType: 'EXPENSE' as const
+    };
+  }
+
+  /**
+   * Specialized processing for INCOME documents
+   */
+  private async processIncomeDocument(extractedData: any, context: any) {
+    devLogger('DocumentProcessingOrchestrator', '💰 Using income-specific classification logic');
+    
+    // For income documents, use different category mapping
+    const incomeCategories = this.getIncomeCategories(extractedData.text);
+    
+    // Extract amount (for income, usually the main amount)
+    const amounts = extractedData.amounts || [];
+    const primaryAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
+
+    return {
+      transactionType: 'INCOME' as const,
+      category: incomeCategories.category,
+      subcategory: incomeCategories.subcategory,
+      amount: primaryAmount,
+      currency: 'CLP',
+      confidence: incomeCategories.confidence,
+      reasoning: `Income document processed: ${incomeCategories.reasoning}`
+    };
+  }
+
+  /**
+   * Get income-specific categories
+   */
+  private getIncomeCategories(text: string) {
+    const lowerText = text.toLowerCase();
+
+    // Salary/wage patterns
+    if (lowerText.includes('liquidacion') || lowerText.includes('sueldo') || lowerText.includes('salario') || lowerText.includes('remuneracion')) {
+      return {
+        category: 'salario',
+        subcategory: 'sueldo_liquido',
+        confidence: 0.95,
+        reasoning: 'Liquidación de sueldo detected'
+      };
+    }
+
+    // Business/professional income
+    if (lowerText.includes('factura') || lowerText.includes('honorarios') || lowerText.includes('servicios prestados')) {
+      return {
+        category: 'ingresos_profesionales', 
+        subcategory: 'honorarios',
+        confidence: 0.90,
+        reasoning: 'Professional services income detected'
+      };
+    }
+
+    // Transfer received
+    if (lowerText.includes('transferencia recibida') || lowerText.includes('deposito') || lowerText.includes('abono')) {
+      return {
+        category: 'transferencias',
+        subcategory: 'transferencia_recibida',
+        confidence: 0.85,
+        reasoning: 'Transfer received detected'
+      };
+    }
+
+    // Sales income
+    if (lowerText.includes('venta') || lowerText.includes('ingreso por venta')) {
+      return {
+        category: 'ventas',
+        subcategory: 'venta_productos',
+        confidence: 0.80,
+        reasoning: 'Sales income detected'
+      };
+    }
+
+    // Default income category
+    return {
+      category: 'otros_ingresos',
+      subcategory: 'ingresos_varios',
+      confidence: 0.60,
+      reasoning: 'General income document'
+    };
   }
 
 }
