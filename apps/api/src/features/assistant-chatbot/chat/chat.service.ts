@@ -11,6 +11,7 @@ import {
   AssistantTool,
 } from "../../assistant-tools/tools.module";
 import { ChatRequest } from "../../../shared/types/chat.request";
+import { asyncChatMessageService } from "../async-chat-message.service";
 
 export type OnIncomingMessageParams =
   | {
@@ -43,6 +44,20 @@ CONTEXTO CHILENO:
 - Entiende términos como "lucas", "palos", UF, UTM
 - Considera el costo de vida y salarios típicos en Chile
 
+NUEVAS CAPACIDADES FINANCIERAS:
+- QUERY_FINANCIAL_TRANSACTIONS: Puedes consultar las transacciones financieras guardadas del usuario
+- CONFIRM_TRANSACTION: Puedes detectar cuando el usuario confirma o rechaza transacciones con "si"/"no"
+- Ejemplos de consultas que puedes responder:
+  * "¿Cuánto gasté en electrónica este mes?" → usar QUERY_FINANCIAL_TRANSACTIONS con category="electronica"
+  * "¿Cuál fue mi último gasto en PC Factory?" → usar QUERY_FINANCIAL_TRANSACTIONS con merchant="PC Factory"
+  * "Muéstrame mis gastos de más de $50.000" → usar QUERY_FINANCIAL_TRANSACTIONS con amountFrom=50000
+  * "¿Cuánto he gastado en total?" → usar QUERY_FINANCIAL_TRANSACTIONS con summaryOnly=true
+
+DETECCIÓN DE CONFIRMACIONES DE TRANSACCIONES:
+- Si el usuario responde "si", "sí", "yes", "ok", "confirmar", "correcto" → usar CONFIRM_TRANSACTION con confirmed=true
+- Si el usuario responde "no", "nope", "cancelar", "incorrecto", "error" → usar CONFIRM_TRANSACTION con confirmed=false
+- SIEMPRE usar CONFIRM_TRANSACTION cuando detectes estas palabras clave en el contexto de transacciones
+
 FUNCIONAMIENTO CON CITAS Y REFLEXIONES:
 - OBLIGATORIO: Para TODA pregunta del usuario, SIEMPRE usa AMBAS herramientas:
   1. PRIMERO usa GET_PERSONAL_KNOWLEDGE con userId "USER_ID_PLACEHOLDER" para buscar información personal
@@ -61,7 +76,7 @@ FUNCIONAMIENTO CON CITAS Y REFLEXIONES:
 - Si el usuario quiere actualizar el progreso de una meta, usa UPDATE_PERSONAL_GOAL con userId "USER_ID_PLACEHOLDER"
 - Si el usuario quiere crear un recordatorio de cualquier tipo, usa CREATE_REMINDER.
 - Si te preguntan sobre indicadores económicos, usa la herramienta disponible
-- CONSEJOS FINANCIEROS: Ahora puedes dar consejos más personalizados ya que tienes acceso a conocimiento general + personal + metas del usuario
+- CONSEJOS FINANCIEROS: Ahora puedes dar consejos más personalizados ya que tienes acceso a conocimiento general + personal + metas del usuario + historial de transacciones
 - Ejemplos que requieren ADD_PERSONAL_KNOWLEDGE: "Gano 500 mil pesos", "Mi gasto en comida es 100 mil", "Quiero ahorrar para una casa", "Tengo una deuda de 2 millones"
 - Ejemplos que requieren CREATE_PERSONAL_GOAL: "Quiero ahorrar 5 millones para un auto", "Mi meta es reducir mi deuda a la mitad este año", "Quiero invertir 100 mil mensuales"
 - Las respuestas de consejos financieros NO se almacenan, solo las metas y datos personales
@@ -89,6 +104,10 @@ export const callChatOnIncomingMessage = async ({
       AssistantTools[AssistantTool.UPDATE_PERSONAL_GOAL],
     [AssistantTool.GET_GENERAL_KNOWLEDGE]:
       AssistantTools[AssistantTool.GET_GENERAL_KNOWLEDGE],
+    [AssistantTool.QUERY_FINANCIAL_TRANSACTIONS]:
+      AssistantTools[AssistantTool.QUERY_FINANCIAL_TRANSACTIONS],
+    [AssistantTool.CONFIRM_TRANSACTION]:
+      AssistantTools[AssistantTool.CONFIRM_TRANSACTION],
     [AssistantTool.CREATE_REMINDER]:
       AssistantTools[AssistantTool.CREATE_REMINDER],
   };
@@ -99,6 +118,15 @@ export const callChatOnIncomingMessage = async ({
       content: CONTENT_ONLY_RAG.replace(/USER_ID_PLACEHOLDER/g, userId),
     },
   ];
+
+  // Check for pending async messages (file upload confirmations, transaction requests, etc.)
+  const pendingMessages = asyncChatMessageService.getPendingMessages(userId);
+  if (pendingMessages.length > 0) {
+    // Convert async messages to core messages and inject them
+    const asyncMessages =
+      asyncChatMessageService.convertToCoreMessages(pendingMessages);
+    prompts.push(...asyncMessages);
+  }
 
   return streamText({
     model: client("gpt-4o"),

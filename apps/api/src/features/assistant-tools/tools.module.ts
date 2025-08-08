@@ -8,6 +8,8 @@ import {getPersonalGoalsTool} from "./tools/get-personal-goals.tool";
 import {updatePersonalGoalTool} from "./tools/update-personal-goal.tool";
 import {createReminderTool} from "./tools/create-reminder.tool";
 import {getGeneralKnowledgeTool} from "./tools/get-general-knowledge.tool";
+import {queryFinancialTransactionsTool} from "./tools/query-financial-transactions.tool";
+import {confirmTransactionTool} from "./tools/confirm-transaction.tool";
 
 export enum AssistantTool {
     ANALYZE_FINANCIAL_DOCUMENT = 'ANALYZE_FINANCIAL_DOCUMENT',
@@ -19,7 +21,9 @@ export enum AssistantTool {
     GET_PERSONAL_GOALS = 'GET_PERSONAL_GOALS',
     UPDATE_PERSONAL_GOAL = 'UPDATE_PERSONAL_GOAL',
     CREATE_REMINDER = 'CREATE_REMINDER',
-    GET_GENERAL_KNOWLEDGE = 'GET_GENERAL_KNOWLEDGE'
+    GET_GENERAL_KNOWLEDGE = 'GET_GENERAL_KNOWLEDGE',
+    QUERY_FINANCIAL_TRANSACTIONS = 'QUERY_FINANCIAL_TRANSACTIONS',
+    CONFIRM_TRANSACTION = 'CONFIRM_TRANSACTION'
 }
 
 export const AssistantTools = {
@@ -32,5 +36,7 @@ export const AssistantTools = {
     [AssistantTool.GET_PERSONAL_GOALS]: getPersonalGoalsTool,
     [AssistantTool.UPDATE_PERSONAL_GOAL]: updatePersonalGoalTool,
     [AssistantTool.CREATE_REMINDER]: createReminderTool,
-    [AssistantTool.GET_GENERAL_KNOWLEDGE]: getGeneralKnowledgeTool
+    [AssistantTool.GET_GENERAL_KNOWLEDGE]: getGeneralKnowledgeTool,
+    [AssistantTool.QUERY_FINANCIAL_TRANSACTIONS]: queryFinancialTransactionsTool,
+    [AssistantTool.CONFIRM_TRANSACTION]: confirmTransactionTool
 }

@@ -8,6 +8,7 @@ import { openAIVisionService } from "./openai-vision.service";
 import { documentConverterService } from "./document-converter.service";
 import { analysisMergerService } from "./analysis-merger.service";
 import { documentTypeClassifierService } from "./document-type-classifier.service";
+import { transactionConfirmationService } from "./transaction-confirmation.service";
 import { supabase } from "../../providers/supabase";
 import { documentProcessingLogs } from "../../providers/supabase/schema/document-processing-logs";
 import { eq } from "drizzle-orm";
@@ -47,6 +48,7 @@ export class DocumentProcessingOrchestrator {
     const documentId = nanoid();
     
     devLogger('DocumentProcessingOrchestrator', `🚀 Starting document processing pipeline - Document: ${documentId}, User: ${request.userId}, Object: ${request.objectName}`);
+    devLogger('DocumentProcessingOrchestrator', `🔍 User ID validation - Type: ${typeof request.userId}, Length: ${request.userId.length}, Is UUID: ${/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.userId)}`);
 
     // Create processing log entry
     const processingLog = await this.createProcessingLog(request, documentId);
@@ -248,62 +250,53 @@ export class DocumentProcessingOrchestrator {
         }
       });
 
-      // Stage 4: Store Financial Transaction
-      await this.updateProcessingStatus(processingLog.id, 'PROCESSING_CLASSIFICATION', 'TRANSACTION_CREATION');
+      // Stage 4: Request User Confirmation (instead of storing directly)
+      await this.updateProcessingStatus(processingLog.id, 'PENDING_CONFIRMATION', 'USER_CONFIRMATION');
       
-      let transactionId: string | undefined;
       let processingStatus: 'COMPLETED' | 'MANUAL_REVIEW_REQUIRED' = 'COMPLETED';
 
-      // Store all transactions regardless of confidence (user requested no manual review)
-      devLogger('DocumentProcessingOrchestrator', `💾 Storing transaction with confidence: ${finalConfidence}`);
+      devLogger('DocumentProcessingOrchestrator', `🔔 Requesting user confirmation for transaction with confidence: ${finalConfidence}`);
 
-      // Always process and store the transaction
-      const transaction = await financialTransactionRepository.create({
+      // Request user confirmation instead of storing directly
+      await transactionConfirmationService.requestUserConfirmation({
+        processingLogId: processingLog.id,
         userId: request.userId,
-        documentId: documentId,
-        transactionType: finalResult.transactionType,
-        category: finalResult.category,
-        subcategory: finalResult.subcategory,
-        amount: finalResult.amount.toString(),
-        currency: finalResult.currency || 'CLP',
-        transactionDate: new Date(finalResult.transactionDate),
-        description: finalResult.description,
-        merchant: finalResult.merchant,
-        confidenceScore: finalConfidence.toString(),
-        status: finalConfidence > 0.8 ? 'VERIFIED' : 'CLASSIFIED',
-        processingMethod: 'HYBRID',
-        metadata: {
-          documentType: request.documentType,
-          source: request.source,
-          ocrConfidence: ocrAnalysisResult.extractedData ? this.calculateOCRConfidence(ocrAnalysisResult.extractedData) : 0,
-          classificationConfidence: classificationResult.confidence,
-          llmConfidence: llmResult.confidence,
-          hasDiscrepancies: mergedAnalysisResult.discrepancies.length > 0,
-          discrepancies: mergedAnalysisResult.discrepancies,
-          extractedAmounts: ocrAnalysisResult.extractedData?.financialData?.amounts || [],
-          extractedDates: ocrAnalysisResult.extractedData?.financialData?.dates || []
-        }
+        transactionDetails: {
+          transactionType: finalResult.transactionType,
+          category: finalResult.category,
+          subcategory: finalResult.subcategory,
+          amount: finalResult.amount,
+          currency: finalResult.currency || 'CLP',
+          transactionDate: new Date(finalResult.transactionDate),
+          description: finalResult.description,
+          merchant: finalResult.merchant,
+          confidence: finalConfidence
+        },
+        analysisContext: {
+          documentId: documentId,
+          extractedData: ocrAnalysisResult.extractedData,
+          classificationResult,
+          llmVerificationResult: llmResult,
+          visionAnalysisResult,
+          processingTime: Date.now() - startTime
+        },
+        uploadJobData: request
       });
 
-      transactionId = transaction.id;
-      
-      // Update processing log with transaction ID
-      await this.updateProcessingData(processingLog.id, { transactionId });
-
-      // Final stage: Mark as completed
+      // Final stage: Mark as pending confirmation
       const processingTime = Date.now() - startTime;
       await this.updateProcessingStatus(
         processingLog.id, 
-        'COMPLETED', // Always mark as completed since we store all transactions
-        'FINAL_VALIDATION',
+        'PENDING_CONFIRMATION',
+        'USER_CONFIRMATION',
         processingTime
       );
 
       const result: DocumentProcessingResult = {
         success: true,
-        transactionId,
+        transactionId: undefined, // No transaction ID yet - waiting for confirmation
         processingLogId: processingLog.id,
-        status: 'COMPLETED', // Always completed since we store all transactions
+        status: 'COMPLETED', // Processing is completed, now waiting for user confirmation
         confidence: finalConfidence,
         extractedData: ocrAnalysisResult.extractedData,
         classificationResult,
@@ -312,7 +305,7 @@ export class DocumentProcessingOrchestrator {
         processingTime
       };
 
-      devLogger('DocumentProcessingOrchestrator', `✅ Document processing completed successfully - Transaction: ${transactionId}, Confidence: ${finalConfidence}, Sources: ${mergedAnalysisResult.sourcesUsed.join(', ')}, Discrepancies: ${mergedAnalysisResult.discrepancies.length}, Processing: ${processingTime}ms`);
+      devLogger('DocumentProcessingOrchestrator', `✅ Document processing completed successfully - Awaiting user confirmation, Confidence: ${finalConfidence}, Sources: ${mergedAnalysisResult.sourcesUsed.join(', ')}, Discrepancies: ${mergedAnalysisResult.discrepancies.length}, Processing: ${processingTime}ms`);
 
       return result;
 

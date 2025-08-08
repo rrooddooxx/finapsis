@@ -9,13 +9,12 @@ export const handleUiChatInput = async (c: Context) => {
     const requestBody = await c.req.json<{ messages: UIMessage[] }>();
     const userEmail = c.req.header('X-User-Email') || 'anonymous@test.com';
 
-    // Find or create the user by email
     const user = await userRepository.findOrCreateUser(userEmail);
 
     const result = await callChatOnIncomingMessage({
         input: 'ui',
         messages: requestBody.messages,
-        userId: user.id // Use the user ID from the database
+        userId: user.id
     })
     return result.toUIMessageStreamResponse({
         onError: (error) => {

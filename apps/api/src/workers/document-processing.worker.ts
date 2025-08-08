@@ -5,11 +5,15 @@ import {
 } from '../features/assistant-financial-documents/document-analyzer.service';
 import { documentProcessingOrchestrator } from '../features/assistant-financial-documents/document-processing-orchestrator.service';
 import { documentClassificationLLMService } from '../features/assistant-financial-documents/document-classification-llm.service';
+import { transactionConfirmationService } from '../features/assistant-financial-documents/transaction-confirmation.service';
+import { asyncChatMessageService } from '../features/assistant-chatbot/async-chat-message.service';
 import {queueService} from './services/queue.service';
 import {
     DocumentAnalysisJobData,
     DocumentProcessingCompletedJobData,
     DocumentUploadJobData,
+    DocumentConfirmationJobData,
+    TransactionConfirmationResponseJobData,
     JOB_QUEUES,
 } from './jobs/document-processing.jobs';
 
@@ -17,6 +21,8 @@ export class DocumentProcessingWorker {
     private uploadWorker!: Worker<DocumentUploadJobData>;
     private analysisWorker!: Worker<DocumentAnalysisJobData>;
     private completedWorker!: Worker<DocumentProcessingCompletedJobData>;
+    private confirmationWorker!: Worker<DocumentConfirmationJobData>;
+    private confirmationResponseWorker!: Worker<TransactionConfirmationResponseJobData>;
     private readonly connection: ConnectionOptions;
 
     constructor() {
@@ -37,6 +43,8 @@ export class DocumentProcessingWorker {
         await this.uploadWorker.close();
         await this.analysisWorker.close();
         await this.completedWorker.close();
+        await this.confirmationWorker.close();
+        await this.confirmationResponseWorker.close();
 
         devLogger('Document Worker', '🔨 Document processing workers shut down');
     }
@@ -72,6 +80,26 @@ export class DocumentProcessingWorker {
             }
         );
 
+        // Document Confirmation Worker - Sends confirmation messages to chat
+        this.confirmationWorker = new Worker<DocumentConfirmationJobData>(
+            JOB_QUEUES.DOCUMENT_CONFIRMATION,
+            this.handleConfirmationRequest.bind(this),
+            {
+                connection: this.connection,
+                concurrency: 5, // Process up to 5 confirmations concurrently
+            }
+        );
+
+        // Transaction Confirmation Response Worker - Processes user confirmations
+        this.confirmationResponseWorker = new Worker<TransactionConfirmationResponseJobData>(
+            JOB_QUEUES.TRANSACTION_CONFIRMATION_RESPONSE,
+            this.handleConfirmationResponse.bind(this),
+            {
+                connection: this.connection,
+                concurrency: 3, // Process up to 3 responses concurrently
+            }
+        );
+
         this.setupEventHandlers();
         devLogger('Document Worker', '🔨 Document processing workers initialized');
     }
@@ -102,6 +130,24 @@ export class DocumentProcessingWorker {
 
         this.completedWorker.on('failed', (job, err) => {
             devLogger('Completed Worker', `❌ Job ${job?.id} failed: ${err.message}`);
+        });
+
+        // Confirmation Worker Events
+        this.confirmationWorker.on('completed', (job) => {
+            devLogger('Confirmation Worker', `✅ Job ${job.id} completed successfully`);
+        });
+
+        this.confirmationWorker.on('failed', (job, err) => {
+            devLogger('Confirmation Worker', `❌ Job ${job?.id} failed: ${err.message}`);
+        });
+
+        // Confirmation Response Worker Events
+        this.confirmationResponseWorker.on('completed', (job) => {
+            devLogger('Confirmation Response Worker', `✅ Job ${job.id} completed successfully`);
+        });
+
+        this.confirmationResponseWorker.on('failed', (job, err) => {
+            devLogger('Confirmation Response Worker', `❌ Job ${job?.id} failed: ${err.message}`);
         });
     }
 
@@ -328,6 +374,95 @@ export class DocumentProcessingWorker {
 
         } catch (error) {
             devLogger('Completed Worker', `❌ Error handling completed financial analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error; // BullMQ will handle retries
+        }
+    }
+
+    // Handle confirmation request - Send message to chat interface
+    private async handleConfirmationRequest(job: Job<DocumentConfirmationJobData>) {
+        const data = job.data;
+        devLogger('Confirmation Worker', `🔔 Processing confirmation request for user: ${data.userId}`);
+
+        try {
+            // Generate confirmation message
+            const confirmationMessage = transactionConfirmationService.generateConfirmationMessage(data.transactionDetails);
+
+            devLogger('Confirmation Worker', `📨 Sending confirmation message to chat via SSE for processing log: ${data.processingLogId}`);
+            
+            // Send confirmation request message to chat interface via SSE
+            await asyncChatMessageService.sendTransactionConfirmationRequest(
+                data.userId,
+                confirmationMessage,
+                data.processingLogId,
+                data.transactionDetails
+            );
+
+            devLogger('Confirmation Worker', `✅ Confirmation message sent to user ${data.userId} via async messaging`);
+            return {
+                status: 'confirmation_sent',
+                userId: data.userId,
+                processingLogId: data.processingLogId,
+                message: 'Confirmation request processed successfully'
+            };
+
+        } catch (error) {
+            devLogger('Confirmation Worker', `❌ Error processing confirmation request: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error; // BullMQ will handle retries
+        }
+    }
+
+    // Handle confirmation response - Process user "si"/"no" response
+    private async handleConfirmationResponse(job: Job<TransactionConfirmationResponseJobData>) {
+        const data = job.data;
+        devLogger('Confirmation Response Worker', `📝 Processing confirmation response - User: ${data.userId}, Confirmed: ${data.confirmed}`);
+
+        try {
+            if (data.confirmed && data.transactionData) {
+                // User confirmed - store the transaction
+                const result = await transactionConfirmationService.storeConfirmedTransaction(
+                    data.transactionData,
+                    data.userId
+                );
+
+                if (result.success) {
+                    devLogger('Confirmation Response Worker', `✅ Transaction stored successfully - ID: ${result.transactionId}`);
+                    
+                    // TODO: Send success message to chat
+                    devLogger('Confirmation Response Worker', `📨 Success message: ${result.message}`);
+                    
+                    return {
+                        status: 'confirmed_and_stored',
+                        transactionId: result.transactionId,
+                        message: result.message
+                    };
+                } else {
+                    devLogger('Confirmation Response Worker', `❌ Error storing transaction: ${result.error}`);
+                    
+                    // TODO: Send error message to chat
+                    devLogger('Confirmation Response Worker', `📨 Error message: ${result.message}`);
+                    
+                    return {
+                        status: 'storage_failed',
+                        error: result.error,
+                        message: result.message
+                    };
+                }
+            } else {
+                // User rejected - don't store transaction
+                devLogger('Confirmation Response Worker', `❌ Transaction rejected by user`);
+                
+                // TODO: Send rejection confirmation to chat
+                const rejectionMessage = "❌ Transacción cancelada como solicitaste. No se guardó en tu historial financiero.";
+                devLogger('Confirmation Response Worker', `📨 Rejection message: ${rejectionMessage}`);
+                
+                return {
+                    status: 'rejected',
+                    message: rejectionMessage
+                };
+            }
+
+        } catch (error) {
+            devLogger('Confirmation Response Worker', `❌ Error processing confirmation response: ${error instanceof Error ? error.message : 'Unknown error'}`);
             throw error; // BullMQ will handle retries
         }
     }

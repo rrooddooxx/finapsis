@@ -21,6 +21,7 @@ export class DocumentUploadService {
                 bucketName: config.bucketName,
                 namespace: config.namespace,
             });
+            devLogger('DocumentUploadService', `🔍 User ID validation - Type: ${typeof userId}, Length: ${userId.length}, Is UUID: ${/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)}`);
 
             const putObjectRequest: objectstorage.requests.PutObjectRequest = {
                 namespaceName: config.namespace,

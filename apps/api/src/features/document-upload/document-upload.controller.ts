@@ -1,6 +1,8 @@
 import {Context} from "hono";
 import {documentUploadService} from "./document-upload.service";
 import {userRepository} from "../users/user.repository";
+import {asyncChatMessageService} from "../assistant-chatbot/async-chat-message.service";
+import {devLogger} from "../../utils/logger.utils";
 
 export const handleDocumentUpload = async (c: Context) => {
     try {
@@ -23,6 +25,11 @@ export const handleDocumentUpload = async (c: Context) => {
             user.id,
             contentType
         );
+
+        // Send async confirmation message to chat interface (will appear in next chat message)
+        devLogger('DocumentUpload', `🚀 About to send file upload confirmation for user ${user.id}, file: ${fileName}`);
+        await asyncChatMessageService.sendFileUploadConfirmation(user.id, fileName);
+        devLogger('DocumentUpload', `✅ File upload confirmation sent for user ${user.id}`);
 
         return c.json({
             success: true,
@@ -65,6 +72,9 @@ export const handleMessagingUpload = async (c: Context) => {
             user.id,
             contentType
         );
+
+        // Send async confirmation message to chat interface (will appear in next chat message)
+        await asyncChatMessageService.sendFileUploadConfirmation(user.id, fileName);
 
         return c.json({
             success: true,
