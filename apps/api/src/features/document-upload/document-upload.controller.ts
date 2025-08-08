@@ -1,17 +1,18 @@
-
-import { Context } from "hono";
-import { documentUploadService } from "./document-upload.service";
+import {Context} from "hono";
+import {documentUploadService} from "./document-upload.service";
+import {userRepository} from "../users/user.repository";
 
 export const handleDocumentUpload = async (c: Context) => {
     try {
-        const userId = c.req.header('X-User-Email') || 'anonymous';
+        const userId = c.req.header('X-User-Email') || 'anonymous@test.com';
         const fileName = c.req.header('X-File-Name') || `upload-${Date.now()}`;
         const contentType = c.req.header('Content-Type') || 'application/octet-stream';
-        
+        const user = await userRepository.findOrCreateUser(userId);
+
         const fileBody = await c.req.arrayBuffer();
 
         if (!fileBody || fileBody.byteLength === 0) {
-            return c.json({ success: false, message: 'No file content uploaded' }, 400);
+            return c.json({success: false, message: 'No file content uploaded'}, 400);
         }
 
         const fileBuffer = Buffer.from(fileBody);
@@ -19,19 +20,19 @@ export const handleDocumentUpload = async (c: Context) => {
         const objectName = await documentUploadService.uploadDocument(
             fileName,
             fileBuffer,
-            userId,
+            user.id,
             contentType
         );
 
-        return c.json({ 
-            success: true, 
-            message: 'File uploaded successfully', 
-            objectName 
+        return c.json({
+            success: true,
+            message: 'File uploaded successfully',
+            objectName
         });
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        return c.json({ success: false, message: errorMessage }, 500);
+        return c.json({success: false, message: errorMessage}, 500);
     }
 };
 
@@ -39,12 +40,13 @@ export const handleMessagingUpload = async (c: Context) => {
     try {
         const userId = c.req.header('X-User-Email') || 'anonymous';
         const body = await c.req.json();
-        const { fileUrl, chatId, telegramUser } = body;
+        const {fileUrl, chatId, telegramUser} = body;
 
         if (!fileUrl) {
-            return c.json({ success: false, message: 'Missing fileUrl' }, 400);
+            return c.json({success: false, message: 'Missing fileUrl'}, 400);
         }
 
+        const user = await userRepository.findOrCreateUser(userId);
         // Download the file directly in the controller
         const fileResponse = await fetch(fileUrl);
         if (!fileResponse.ok) {
@@ -60,13 +62,13 @@ export const handleMessagingUpload = async (c: Context) => {
         const objectName = await documentUploadService.uploadDocument(
             fileName,
             fileBuffer,
-            userId,
+            user.id,
             contentType
         );
 
-        return c.json({ 
-            success: true, 
-            message: 'File processed and uploaded successfully from URL', 
+        return c.json({
+            success: true,
+            message: 'File processed and uploaded successfully from URL',
             objectName,
             source: 'telegram',
             chatId,
@@ -75,6 +77,6 @@ export const handleMessagingUpload = async (c: Context) => {
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        return c.json({ success: false, message: errorMessage }, 500);
+        return c.json({success: false, message: errorMessage}, 500);
     }
 };

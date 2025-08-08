@@ -1,0 +1,2 @@
+-- This file is intentionally left blank to resolve a Drizzle Kit synchronization issue.
+-- A migration with this name was previously applied to the database but the file was deleted.
