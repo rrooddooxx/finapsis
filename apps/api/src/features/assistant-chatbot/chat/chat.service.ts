@@ -32,9 +32,17 @@ CONTEXTO CHILENO:
 - Entiende términos como "lucas", "palos", UF, UTM
 - Considera el costo de vida y salarios típicos en Chile
 
-FUNCIONAMIENTO:
-- OBLIGATORIO: Para TODA pregunta del usuario, PRIMERO usa GET_PERSONAL_KNOWLEDGE con userId "USER_ID_PLACEHOLDER" para buscar información personal
-- OBLIGATORIO: Si el usuario tiene dudas sobre situaciones financieras en general (deudas, leyes, etc.), usa la herramienta disponible 
+FUNCIONAMIENTO CON CITAS Y REFLEXIONES:
+- OBLIGATORIO: Para TODA pregunta del usuario, SIEMPRE usa AMBAS herramientas:
+  1. PRIMERO usa GET_PERSONAL_KNOWLEDGE con userId "USER_ID_PLACEHOLDER" para buscar información personal
+  2. SIEMPRE DESPUÉS usa GET_GENERAL_KNOWLEDGE para complementar con conocimiento financiero general
+- Usa ambas herramientas independientemente de si una encuentra información o no
+- FORMATO DE RESPUESTA ESTRUCTURADO:
+  * PRIMERO: Responde normalmente con tu conocimiento y análisis
+  * DESPUÉS: Si encontraste embeddings relevantes, agrégalos en una sección separada con el título "📚 **Información de mi base de conocimientos:**"
+  * CITAS: Presenta cada embedding como: > "*contenido del embedding*" \n\n— *Fuente: [nombre_fuente]*
+  * Usa líneas en blanco para separar claramente las secciones y hacer la respuesta más legible
+- Si no encuentras información relevante en los embeddings, usa tu conocimiento general financiero normalmente
 - NUEVO: El sistema ahora incluye automáticamente las metas financieras del usuario en las respuestas (información ya embebida y searchable)
 - Si el usuario menciona datos como: salario, ingresos, gastos, deudas, metas financieras, presupuesto, inversiones, etc. usa ADD_PERSONAL_KNOWLEDGE con userId "USER_ID_PLACEHOLDER" para guardar esa información INMEDIATAMENTE
 - Si el usuario quiere establecer metas financieras (ahorrar, invertir, reducir deudas, etc.) usa CREATE_PERSONAL_GOAL con userId "USER_ID_PLACEHOLDER" (se crearán embeddings automáticamente)
@@ -56,7 +64,8 @@ export const callChatOnIncomingMessage = async ({input, messages, userId = 'demo
         [AssistantTool.ADD_PERSONAL_KNOWLEDGE]: AssistantTools[AssistantTool.ADD_PERSONAL_KNOWLEDGE],
         [AssistantTool.CREATE_PERSONAL_GOAL]: AssistantTools[AssistantTool.CREATE_PERSONAL_GOAL],
         [AssistantTool.GET_PERSONAL_GOALS]: AssistantTools[AssistantTool.GET_PERSONAL_GOALS],
-        [AssistantTool.UPDATE_PERSONAL_GOAL]: AssistantTools[AssistantTool.UPDATE_PERSONAL_GOAL]
+        [AssistantTool.UPDATE_PERSONAL_GOAL]: AssistantTools[AssistantTool.UPDATE_PERSONAL_GOAL],
+        [AssistantTool.GET_GENERAL_KNOWLEDGE]: AssistantTools[AssistantTool.GET_GENERAL_KNOWLEDGE]
     };
 
     const prompts: ModelMessage[] = [{

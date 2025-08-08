@@ -131,7 +131,7 @@ export const searchEmbeddings = async (options: SearchEmbeddingsOptions) => {
         includeGeneralContent = true,
         metadataFilters,
         limit = 5,
-        threshold = 0.5
+        threshold = 0.1
     } = options;
 
     console.log('🔍 Searching universal embeddings:', { 
@@ -145,6 +145,7 @@ export const searchEmbeddings = async (options: SearchEmbeddingsOptions) => {
     
     try {
         const queryEmbedding = await generateEmbedding(query);
+        
         const similarity = sql<number>`1 - (
             ${cosineDistance(
                 embeddings.embedding,
@@ -152,7 +153,7 @@ export const searchEmbeddings = async (options: SearchEmbeddingsOptions) => {
             )}
         )`;
 
-        // Build where conditions
+        // Build where conditions - use low threshold to find more results
         const whereConditions = [gt(similarity, threshold)];
 
         // Entity type filter
