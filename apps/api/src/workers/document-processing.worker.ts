@@ -3,6 +3,8 @@ import {devLogger} from '../utils/logger.utils';
 import {
     documentAnalyzerService
 } from '../features/assistant-financial-documents/document-analyzer.service';
+import { documentProcessingOrchestrator } from '../features/assistant-financial-documents/document-processing-orchestrator.service';
+import { documentClassificationLLMService } from '../features/assistant-financial-documents/document-classification-llm.service';
 import {queueService} from './services/queue.service';
 import {
     DocumentAnalysisJobData,
@@ -103,68 +105,67 @@ export class DocumentProcessingWorker {
         });
     }
 
-    // Process document upload job - Start OCI Document AI analysis
+    // Process document upload job - Execute full classification pipeline
     private async processDocumentUpload(job: Job<DocumentUploadJobData>) {
         const data = job.data;
-        devLogger('Upload Worker', `🔍 Processing document upload: ${data.objectName}`);
+        devLogger('Upload Worker', `🔍 Processing document upload with full classification chain: ${data.objectName}`);
 
         try {
-            // Start document analysis with OCI Document AI
-            const analysisResult = await documentAnalyzerService.analyzeDocument({
+            // Execute the full classification pipeline using the orchestrator
+            const result = await documentProcessingOrchestrator.processDocument({
                 bucketName: data.bucketName,
                 objectName: data.objectName,
                 objectId: data.objectId,
                 namespace: data.namespace,
-                userId: data.userId,
-                config: {
-                    features: [
-                        {type: 'TEXT_DETECTION', maxResults: 100},
-                        {type: 'KEY_VALUE_DETECTION', maxResults: 50},
-                        ...(data.includeTableExtraction !== false ? [{
-                            type: 'TABLE_EXTRACTION' as const,
-                            maxResults: 20
-                        }] : []),
-                    ],
-                    documentType: data.documentType,
-                    language: data.language || 'es',
-                    includeOutputLocation: true,
-                },
+                userId: data.userId || `anonymous_${Date.now()}`, // Fallback if userId is missing
+                documentType: data.documentType,
+                source: data.source,
+                eventTime: data.eventTime
             });
 
-            if (analysisResult.status === 'processing' && analysisResult.jobId) {
-                // Schedule status check job for later
-                await queueService.addDocumentAnalysisJob({
-                    analysisJobId: analysisResult.jobId,
-                    uploadJobData: data,
-                    maxRetries: 10,
-                    retryDelay: 30000, // 30 seconds
-                });
-
-                devLogger('Upload Worker', `📊 Analysis job ${analysisResult.jobId} started, scheduled status checks`);
-                return {status: 'analysis_started', jobId: analysisResult.jobId};
-            }
-
-            if (analysisResult.status === 'completed') {
-                // Immediate completion (rare case)
+            if (result.success) {
+                // Queue completion job for notifications and further processing
                 await queueService.addDocumentCompletedJob({
-                    analysisJobId: analysisResult.jobId || `immediate-${Date.now()}`,
-                    extractedData: analysisResult.extractedData || {},
+                    analysisJobId: result.processingLogId,
+                    extractedData: result.extractedData || {},
+                    classificationResult: result.classificationResult,
+                    llmVerificationResult: result.llmVerificationResult,
                     uploadJobData: data,
-                    processingTime: 0,
-                    status: 'completed',
+                    processingTime: result.processingTime,
+                    status: result.status === 'COMPLETED' ? 'completed' : 
+                           result.status === 'MANUAL_REVIEW_REQUIRED' ? 'manual_review' : 'failed',
                 });
 
-                devLogger('Upload Worker', `🎉 Document analysis completed immediately`);
-                return {status: 'completed_immediately'};
+                devLogger('Upload Worker', `✅ Document processing completed successfully`, {
+                    transactionId: result.transactionId,
+                    status: result.status,
+                    confidence: result.confidence,
+                    processingTime: result.processingTime
+                });
+
+                return {
+                    status: result.status.toLowerCase(),
+                    transactionId: result.transactionId,
+                    processingLogId: result.processingLogId,
+                    confidence: result.confidence,
+                    processingTime: result.processingTime
+                };
+            } else {
+                // Processing failed
+                await queueService.addDocumentCompletedJob({
+                    analysisJobId: result.processingLogId,
+                    extractedData: {},
+                    uploadJobData: data,
+                    processingTime: result.processingTime,
+                    status: 'failed',
+                    error: result.error
+                });
+
+                throw new Error(`Document processing failed: ${result.error}`);
             }
 
-            if (analysisResult.status === 'failed') {
-                throw new Error(`Document analysis failed: ${analysisResult.error}`);
-            }
-
-            throw new Error(`Unexpected analysis result status: ${analysisResult.status}`);
         } catch (error) {
-            devLogger('Upload Worker', `❌ Error processing document upload: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            devLogger('Upload Worker', `❌ Error in document processing pipeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
             throw error; // BullMQ will handle retries
         }
     }
@@ -243,56 +244,90 @@ export class DocumentProcessingWorker {
         }
     }
 
-    // Handle completed analysis - Send notifications, update database, etc.
+    // Handle completed analysis - Send notifications, generate insights, etc.
     private async handleCompletedAnalysis(job: Job<DocumentProcessingCompletedJobData>) {
         const data = job.data;
-        devLogger('Completed Worker', `🎯 Handling completed analysis: ${data.analysisJobId}`);
+        devLogger('Completed Worker', `🎯 Handling completed financial document analysis: ${data.analysisJobId}`);
 
         try {
-            if (data.status === 'completed') {
-                const {financialData} = data.extractedData;
+            if (data.status === 'completed' || data.status === 'manual_review') {
+                const { financialData } = data.extractedData;
+                const classification = data.classificationResult;
+                const llmVerification = data.llmVerificationResult;
 
-                // Log successful processing
-                devLogger('Completed Worker', `🎉 Document processing completed successfully:
-          - Job ID: ${data.analysisJobId}
-          - User: ${data.uploadJobData.userId || 'Unknown'}
+                // Log comprehensive processing results
+                const logPrefix = data.status === 'manual_review' ? '⚠️ Manual review required' : '✅ Processing completed successfully';
+                devLogger('Completed Worker', `${logPrefix}:
+          - Processing Log ID: ${data.analysisJobId}
+          - User: ${data.uploadJobData.userId || 'Anonymous'}
           - Document: ${data.uploadJobData.objectName}
           - Processing Time: ${data.processingTime}ms
-          - Amounts Found: ${financialData?.amounts?.length || 0}
-          - Merchant: ${financialData?.merchant || 'Not identified'}
-          - Categories: ${financialData?.categories?.join(', ') || 'None'}`);
+          - Transaction Type: ${classification?.transactionType || 'Unknown'}
+          - Category: ${classification?.category || 'Unknown'}
+          - Amount: ${classification?.currency || 'CLP'} ${classification?.amount || 0}
+          - Confidence: ${(classification?.confidence || 0) * 100}%
+          - Merchant: ${classification?.merchant || 'Not identified'}
+          - LLM Verification: ${llmVerification ? 'Yes' : 'No'}
+          - Source: ${data.uploadJobData.source || 'Unknown'}`);
 
-                // TODO: Implement user notifications
-                // - Send WhatsApp message if source was WhatsApp
-                // - Send WebSocket notification if user is online
-                // - Store results in database for later retrieval
+                // Generate financial insights
+                const insights = llmVerification ? 
+                    documentClassificationLLMService.generateFinancialInsights(llmVerification) : [];
 
-                // TODO: Implement business logic
-                // - Categorize expenses automatically
-                // - Update user's financial tracking
-                // - Generate insights and recommendations
+                // TODO: Implement user notifications based on source
+                if (data.uploadJobData.source === 'whatsapp') {
+                    // Send WhatsApp notification with transaction details
+                    devLogger('Completed Worker', '📱 TODO: Send WhatsApp notification');
+                } else if (data.uploadJobData.source === 'web') {
+                    // Send WebSocket notification if user is online
+                    devLogger('Completed Worker', '🌐 TODO: Send WebSocket notification');
+                }
+
+                // TODO: Update user financial summary
+                devLogger('Completed Worker', '📊 TODO: Update user financial summary');
+
+                // TODO: Check for budget alerts or spending patterns
+                if (classification?.transactionType === 'EXPENSE' && (classification.amount || 0) > 50000) {
+                    devLogger('Completed Worker', '💰 TODO: Large expense detected - check budget alerts');
+                }
 
                 return {
-                    status: 'notified',
-                    extractedAmounts: financialData?.amounts?.length || 0,
-                    totalAmount: financialData?.amounts?.reduce((sum, amount) => sum + amount, 0) || 0,
+                    status: 'processed',
+                    transactionType: classification?.transactionType,
+                    category: classification?.category,
+                    amount: classification?.amount || 0,
+                    currency: classification?.currency || 'CLP',
+                    confidence: classification?.confidence || 0,
+                    insights: insights,
+                    processingTime: data.processingTime
                 };
+
             } else {
-                // Handle failed analysis
-                devLogger('Completed Worker', `❌ Document processing failed:
-          - Job ID: ${data.analysisJobId}
-          - User: ${data.uploadJobData.userId || 'Unknown'}
+                // Handle failed processing
+                devLogger('Completed Worker', `❌ Financial document processing failed:
+          - Processing Log ID: ${data.analysisJobId}
+          - User: ${data.uploadJobData.userId || 'Anonymous'}
           - Document: ${data.uploadJobData.objectName}
-          - Error: ${data.error}`);
+          - Error: ${data.error}
+          - Processing Time: ${data.processingTime}ms`);
 
                 // TODO: Implement failure notifications
-                // - Notify user that document processing failed
-                // - Provide suggestions for resubmission
+                if (data.uploadJobData.source === 'whatsapp') {
+                    devLogger('Completed Worker', '📱 TODO: Send WhatsApp error notification');
+                }
 
-                return {status: 'failure_handled', error: data.error};
+                // TODO: Store failed processing for manual review
+                devLogger('Completed Worker', '🔍 TODO: Queue for manual review if confidence is low');
+
+                return {
+                    status: 'failed',
+                    error: data.error,
+                    processingTime: data.processingTime
+                };
             }
+
         } catch (error) {
-            devLogger('Completed Worker', `❌ Error handling completed analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            devLogger('Completed Worker', `❌ Error handling completed financial analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
             throw error; // BullMQ will handle retries
         }
     }

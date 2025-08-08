@@ -18,7 +18,6 @@ export interface FinancialDocumentsConfig {
     documentAI: {
         compartmentId: string;
         namespace: string;
-        resultsbucket?: string;
         region: string;
     };
 
@@ -166,7 +165,6 @@ class FinancialDocumentsConfiguration {
             documentAI: {
                 compartmentId: Bun.env.OCI_COMPARTMENT_ID || '',
                 namespace: Bun.env.OCI_NAMESPACE || 'axjq1e002pwz',
-                resultsbucket: Bun.env.OCI_RESULTS_BUCKET,
                 region: Bun.env.OCI_REGION || 'us-phoenix-1'
             },
 
@@ -225,6 +223,7 @@ class FinancialDocumentsConfiguration {
                 typeMapping: {
                     'receipt': 'RECEIPT',
                     'recibo': 'RECEIPT',
+                    'boleta': 'RECEIPT',
                     'invoice': 'INVOICE',
                     'factura': 'INVOICE',
                     'bank': 'BANK_STATEMENT',
