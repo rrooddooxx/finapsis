@@ -1,17 +1,28 @@
-import {openAiProvider} from "../../../providers/openai/openai.provider";
-import {convertToModelMessages, ModelMessage, stepCountIs, streamText, UIMessage} from "ai";
-import {AssistantTools, AssistantTool} from "../../assistant-tools/tools.module";
-import {ChatRequest} from "../../../shared/types/chat.request";
+import { openAiProvider } from "../../../providers/openai/openai.provider";
+import {
+  convertToModelMessages,
+  ModelMessage,
+  stepCountIs,
+  streamText,
+  UIMessage,
+} from "ai";
+import {
+  AssistantTools,
+  AssistantTool,
+} from "../../assistant-tools/tools.module";
+import { ChatRequest } from "../../../shared/types/chat.request";
 
-export type OnIncomingMessageParams = {
-    input: 'ui',
-    messages: UIMessage[],
-    userId?: string
-} | {
-    input: 'json',
-    messages: ChatRequest,
-    userId?: string
-}
+export type OnIncomingMessageParams =
+  | {
+      input: "ui";
+      messages: UIMessage[];
+      userId?: string;
+    }
+  | {
+      input: "json";
+      messages: ChatRequest;
+      userId?: string;
+    };
 
 const CONTENT_ONLY_RAG = `Eres un asistente financiero especializado en el mercado chileno 🇨🇱. Tu misión es ayudar a las personas a mejorar sus finanzas de manera efectiva y entretenida.
 
@@ -48,40 +59,59 @@ FUNCIONAMIENTO CON CITAS Y REFLEXIONES:
 - Si el usuario quiere establecer metas financieras (ahorrar, invertir, reducir deudas, etc.) usa CREATE_PERSONAL_GOAL con userId "USER_ID_PLACEHOLDER" (se crearán embeddings automáticamente)
 - Si el usuario pregunta por sus metas o progreso, usa GET_PERSONAL_GOALS con userId "USER_ID_PLACEHOLDER"
 - Si el usuario quiere actualizar el progreso de una meta, usa UPDATE_PERSONAL_GOAL con userId "USER_ID_PLACEHOLDER"
+- Si el usuario quiere crear un recordatorio de cualquier tipo, usa CREATE_REMINDER.
 - Si te preguntan sobre indicadores económicos, usa la herramienta disponible
 - CONSEJOS FINANCIEROS: Ahora puedes dar consejos más personalizados ya que tienes acceso a conocimiento general + personal + metas del usuario
 - Ejemplos que requieren ADD_PERSONAL_KNOWLEDGE: "Gano 500 mil pesos", "Mi gasto en comida es 100 mil", "Quiero ahorrar para una casa", "Tengo una deuda de 2 millones"
 - Ejemplos que requieren CREATE_PERSONAL_GOAL: "Quiero ahorrar 5 millones para un auto", "Mi meta es reducir mi deuda a la mitad este año", "Quiero invertir 100 mil mensuales"
 - Las respuestas de consejos financieros NO se almacenan, solo las metas y datos personales
-- Mantén un tono amigable y profesional`
+- Mantén un tono amigable y profesional`;
 
-export const callChatOnIncomingMessage = async ({input, messages, userId = 'demo-user'}: OnIncomingMessageParams) => {
-    const {client} = openAiProvider();
+export const callChatOnIncomingMessage = async ({
+  input,
+  messages,
+  userId = "demo-user",
+}: OnIncomingMessageParams) => {
+  const { client } = openAiProvider();
 
-    const availableTools = {
-        [AssistantTool.MARKET_INDICATORS]: AssistantTools[AssistantTool.MARKET_INDICATORS],
-        [AssistantTool.GET_PERSONAL_KNOWLEDGE]: AssistantTools[AssistantTool.GET_PERSONAL_KNOWLEDGE],
-        [AssistantTool.ADD_PERSONAL_KNOWLEDGE]: AssistantTools[AssistantTool.ADD_PERSONAL_KNOWLEDGE],
-        [AssistantTool.CREATE_PERSONAL_GOAL]: AssistantTools[AssistantTool.CREATE_PERSONAL_GOAL],
-        [AssistantTool.GET_PERSONAL_GOALS]: AssistantTools[AssistantTool.GET_PERSONAL_GOALS],
-        [AssistantTool.UPDATE_PERSONAL_GOAL]: AssistantTools[AssistantTool.UPDATE_PERSONAL_GOAL],
-        [AssistantTool.GET_GENERAL_KNOWLEDGE]: AssistantTools[AssistantTool.GET_GENERAL_KNOWLEDGE]
-    };
+  const availableTools = {
+    [AssistantTool.MARKET_INDICATORS]:
+      AssistantTools[AssistantTool.MARKET_INDICATORS],
+    [AssistantTool.GET_PERSONAL_KNOWLEDGE]:
+      AssistantTools[AssistantTool.GET_PERSONAL_KNOWLEDGE],
+    [AssistantTool.ADD_PERSONAL_KNOWLEDGE]:
+      AssistantTools[AssistantTool.ADD_PERSONAL_KNOWLEDGE],
+    [AssistantTool.CREATE_PERSONAL_GOAL]:
+      AssistantTools[AssistantTool.CREATE_PERSONAL_GOAL],
+    [AssistantTool.GET_PERSONAL_GOALS]:
+      AssistantTools[AssistantTool.GET_PERSONAL_GOALS],
+    [AssistantTool.UPDATE_PERSONAL_GOAL]:
+      AssistantTools[AssistantTool.UPDATE_PERSONAL_GOAL],
+    [AssistantTool.GET_GENERAL_KNOWLEDGE]:
+      AssistantTools[AssistantTool.GET_GENERAL_KNOWLEDGE],
+    [AssistantTool.CREATE_REMINDER]:
+      AssistantTools[AssistantTool.CREATE_REMINDER],
+  };
 
-    const prompts: ModelMessage[] = [{
-        role: 'system',
-        content: CONTENT_ONLY_RAG.replace(/USER_ID_PLACEHOLDER/g, userId),
-    }];
+  const prompts: ModelMessage[] = [
+    {
+      role: "system",
+      content: CONTENT_ONLY_RAG.replace(/USER_ID_PLACEHOLDER/g, userId),
+    },
+  ];
 
-
-    return streamText({
-        model: client('gpt-4o'),
-        messages: prompts.concat(input === 'ui' ? convertToModelMessages(messages) : {
-            role: 'user',
-            content: messages.message
-        }),
-        tools: availableTools,
-        toolChoice: 'auto',
-        stopWhen: stepCountIs(10),
-    })
-}
+  return streamText({
+    model: client("gpt-4o"),
+    messages: prompts.concat(
+      input === "ui"
+        ? convertToModelMessages(messages)
+        : {
+            role: "user",
+            content: messages.message,
+          }
+    ),
+    tools: availableTools,
+    toolChoice: "auto",
+    stopWhen: stepCountIs(10),
+  });
+};
