@@ -43,6 +43,17 @@ export interface DocumentAnalysisResult {
             categories: string[];
             merchant: string | null;
         };
+        documentClassification?: {
+            documentType: string;
+            confidence: number;
+            categories: string[];
+            language?: string;
+        };
+        metadata?: {
+            pageCount?: number;
+            mimeType?: string;
+            extractedAt?: string;
+        };
     };
     error?: string;
 }
@@ -80,16 +91,17 @@ export class DocumentAnalyzerService {
                 language: config.language || 'es'
             };
 
-            // Add output location if configured
-            if (config.includeOutputLocation !== false) {
-                analyzeDocumentDetails.outputLocation = {
-                    namespaceName: docAIConfig.namespace || request.namespace,
-                    bucketName: docAIConfig.resultsbucket || request.bucketName,
-                    prefix: `results/${Date.now()}_${request.objectName}`
-                };
-            }
+            // Note: No outputLocation needed - processing via streaming from upload bucket directly
 
             devLogger("🔄 OCI Document AI request payload:", JSON.stringify(analyzeDocumentDetails, null, 2));
+
+            // Add debug info about the client configuration
+            devLogger("🔧 OCI Document AI client config:", {
+                compartmentId: analyzeDocumentDetails.compartmentId,
+                documentType: analyzeDocumentDetails.documentType,
+                language: analyzeDocumentDetails.language,
+                featureCount: analyzeDocumentDetails.features?.length
+            });
 
             const response = await this.aiDocumentClient.analyzeDocument({
                 analyzeDocumentDetails
@@ -140,13 +152,68 @@ export class DocumentAnalyzerService {
             };
 
         } catch (error) {
-            devLogger("❌ Error analyzing document:", JSON.stringify(error));
+            // Enhanced error logging for OCI SDK issues
+            const errorDetails = this.extractOCIErrorDetails(error);
+            devLogger("❌ OCI Document AI error details:", JSON.stringify(errorDetails, null, 2));
 
             return {
                 status: 'failed',
-                error: error instanceof Error ? error.message : 'Unknown error'
+                error: errorDetails.message || 'OCI Document AI request failed'
             };
         }
+    }
+
+    /**
+     * Extract detailed error information from OCI SDK errors
+     */
+    private extractOCIErrorDetails(error: unknown): any {
+        const details: any = {
+            timestamp: new Date().toISOString(),
+            type: error?.constructor?.name || 'UnknownError'
+        };
+
+        if (error instanceof Error) {
+            details.message = error.message;
+            details.stack = error.stack;
+        } else {
+            details.message = String(error);
+        }
+
+        // OCI SDK specific error properties
+        if (typeof error === 'object' && error !== null) {
+            const ociError = error as any;
+            
+            // Common OCI error properties
+            details.statusCode = ociError.statusCode;
+            details.code = ociError.code;
+            details.opcRequestId = ociError.opcRequestId;
+            details.targetService = ociError.targetService;
+            details.operationName = ociError.operationName;
+            details.cause = ociError.cause;
+            
+            // Try to extract response body if available
+            if (ociError.response) {
+                details.response = {
+                    status: ociError.response.status,
+                    statusText: ociError.response.statusText,
+                    headers: ociError.response.headers
+                };
+                
+                // Try to extract response body
+                if (ociError.response.data) {
+                    details.responseData = ociError.response.data;
+                }
+            }
+            
+            // Extract any other enumerable properties
+            for (const key of Object.keys(ociError)) {
+                if (!details.hasOwnProperty(key) && key !== 'stack') {
+                    details[key] = ociError[key];
+                }
+            }
+        }
+
+        return details;
     }
 
     async getAnalysisResult(jobId: string): Promise<DocumentAnalysisResult> {
@@ -191,8 +258,14 @@ export class DocumentAnalyzerService {
 
     private getDefaultAnalysisConfig(): DocumentAnalysisConfig {
         const defaultFeatures = financialDocumentsConfig.getFeaturesForDocumentType('default');
+        // Always include document classification for financial documents
+        const featuresWithClassification = [
+            ...defaultFeatures,
+            { type: 'DOCUMENT_CLASSIFICATION' as DocumentAnalysisFeatureType, maxResults: 10 }
+        ];
+        
         return {
-            features: defaultFeatures,
+            features: featuresWithClassification,
             language: 'es',
             includeOutputLocation: true
         };
@@ -212,6 +285,13 @@ export class DocumentAnalyzerService {
         if (featureType === 'KEY_VALUE_DETECTION') {
             const supportedTypes = ['INVOICE', 'RECEIPT', 'BANK_STATEMENT', 'CHECK', 'PAYSLIP', 'TAX_FORM'];
             return supportedTypes.includes(documentType || '');
+        }
+        
+        // TABLE_EXTRACTION is not supported for Spanish documents in OCI
+        // Skip table extraction for Spanish/Chilean documents to avoid errors
+        if (featureType === 'TABLE_EXTRACTION') {
+            devLogger('DocumentAnalyzer', '⚠️ Skipping TABLE_EXTRACTION for Spanish documents due to OCI limitations');
+            return false;
         }
 
         // All other features are supported for all document types
@@ -261,8 +341,8 @@ export class DocumentAnalyzerService {
 
             // Clean up the extracted text
             extractedText = extractedText.trim();
-            devLogger("📝 Extracted text length:", extractedText.length, "characters");
-            devLogger("📄 Extracted text preview:", extractedText.substring(0, 200) + "...");
+            devLogger('DocumentAnalyzer', `📝 Extracted text length: ${extractedText.length} characters`);
+            devLogger('DocumentAnalyzer', `📄 Extracted text preview: ${extractedText.substring(0, 200)}...`);
 
             const extractedData = {
                 text: extractedText,
@@ -280,7 +360,7 @@ export class DocumentAnalyzerService {
             return extractedData;
 
         } catch (error) {
-            devLogger("❌ Error parsing analysis results:", error);
+            devLogger('DocumentAnalyzer', `❌ Error parsing analysis results: ${error}`);
             return null;
         }
     }
@@ -295,9 +375,39 @@ export class DocumentAnalyzerService {
     }
 
     private extractAmounts(text: string): number[] {
-        const amountRegex = /\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g;
-        const matches = text.match(amountRegex) || [];
-        return matches.map(match => parseFloat(match.replace(/[$,]/g, '')));
+        // Improved Chilean peso amount patterns
+        const amountPatterns = [
+            // Chilean peso with period separators: 345.980, $345.980
+            /\$?(\d{1,3}(?:\.\d{3})+(?:,\d{2})?)/g,
+            // Standard formats: $345,980.00, 345,980.00
+            /\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g,
+            // Simple numbers that might be amounts (3+ digits)
+            /\b(\d{3,})\b/g
+        ];
+        
+        const foundAmounts = new Set<number>();
+        
+        for (const pattern of amountPatterns) {
+            const matches = text.match(pattern) || [];
+            for (const match of matches) {
+                // Clean and parse the number
+                let cleanAmount = match.replace(/[$,]/g, '');
+                
+                // Handle Chilean format (periods as thousands separator)
+                if (cleanAmount.includes('.') && !cleanAmount.match(/\.\d{2}$/)) {
+                    // This is likely a thousands separator, not decimal
+                    cleanAmount = cleanAmount.replace(/\./g, '');
+                }
+                
+                const amount = parseFloat(cleanAmount);
+                if (!isNaN(amount) && amount >= 1) {
+                    foundAmounts.add(amount);
+                }
+            }
+        }
+        
+        // Return sorted amounts (largest first)
+        return Array.from(foundAmounts).sort((a, b) => b - a);
     }
 
     private extractDates(text: string): string[] {

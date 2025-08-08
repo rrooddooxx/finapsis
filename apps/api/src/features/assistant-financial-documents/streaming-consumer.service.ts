@@ -176,7 +176,7 @@ export class StreamingConsumerService {
                 objectId: message.data.resourceId,
                 namespace: message.data.additionalDetails.namespace,
 
-                // User Context (TODO: Extract from object metadata or naming convention)
+                // User Context - Extract from object name or generate anonymous ID
                 userId: this.extractUserIdFromObjectName(message.data.resourceName),
                 source: this.determineSource(message.data.resourceName),
 
@@ -208,14 +208,28 @@ export class StreamingConsumerService {
     }
 
     // Helper methods for extracting metadata from object names and events
-    private extractUserIdFromObjectName(objectName: string): string | undefined {
-        // TODO: Implement user extraction logic based on your naming convention
+    private extractUserIdFromObjectName(objectName: string): string {
+        // Try to extract user ID from object name patterns
         // Examples:
         // - user123_receipt_20241107.jpg -> user123
         // - receipts/user456/document.pdf -> user456
-        // - For now, try to extract from prefix
-        const userMatch = objectName.match(/(?:^|\/|_)user(\d+)(?:_|\/|\.)/i);
-        return userMatch ? `user${userMatch[1]}` : undefined;
+        // - users/user789/documents/file.pdf -> user789
+        
+        const patterns = [
+            /(?:^|\/|_)user(\w+)(?:_|\/|\.)/i,      // user123_ or /user123/ or user123.
+            /\/users\/([^\/]+)\//i,                   // /users/userId/
+            /\/(\w+)\/documents\//i                   // /userId/documents/
+        ];
+        
+        for (const pattern of patterns) {
+            const match = objectName.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        
+        // If no user ID found, generate a random UUID for tracking
+        return `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     }
 
     private determineSource(objectName: string): 'whatsapp' | 'web' | 'api' {

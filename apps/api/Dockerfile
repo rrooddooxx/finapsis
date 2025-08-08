@@ -2,6 +2,9 @@ FROM oven/bun:1.0-alpine AS base
 
 WORKDIR /app
 
+# Install PDF conversion dependencies
+RUN apk add --no-cache graphicsmagick ghostscript poppler-utils
+
 # Copy package files
 COPY package.json bun.lockb* ./
 COPY apps/api/package.json ./apps/api/
@@ -22,6 +25,9 @@ RUN bun run build
 FROM oven/bun:1.0-alpine AS production
 
 WORKDIR /app
+
+# Install PDF conversion dependencies in production
+RUN apk add --no-cache graphicsmagick ghostscript poppler-utils
 
 # Copy built application
 COPY --from=base /app/apps/api/dist ./dist

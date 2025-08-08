@@ -47,6 +47,39 @@ export interface DocumentProcessingCompletedJobData {
     };
     tables?: any[];
     keyValues?: any[];
+    documentClassification?: {
+      documentType: string;
+      confidence: number;
+      categories: string[];
+      language?: string;
+    };
+    metadata?: {
+      pageCount?: number;
+      mimeType?: string;
+      extractedAt?: string;
+    };
+  };
+  
+  // Classification Results
+  classificationResult?: {
+    transactionType: 'INCOME' | 'EXPENSE';
+    category: string;
+    subcategory?: string;
+    amount: number;
+    currency: string;
+    transactionDate: Date;
+    description: string;
+    merchant?: string;
+    confidence: number;
+    reasoning: string;
+  };
+  
+  llmVerificationResult?: {
+    transactionType: 'INCOME' | 'EXPENSE';
+    category: string;
+    amount: number;
+    confidence: number;
+    discrepancies?: string[];
   };
   
   // Original Context
@@ -54,7 +87,7 @@ export interface DocumentProcessingCompletedJobData {
   
   // Processing Metadata
   processingTime: number;
-  status: 'completed' | 'failed';
+  status: 'completed' | 'failed' | 'manual_review';
   error?: string;
 }
 
@@ -73,5 +106,8 @@ export const JOB_QUEUES = {
 export const JOB_TYPES = {
   PROCESS_DOCUMENT_UPLOAD: 'process-document-upload',
   CHECK_ANALYSIS_STATUS: 'check-analysis-status',
+  CLASSIFY_FINANCIAL_TRANSACTION: 'classify-financial-transaction',
+  VERIFY_WITH_LLM: 'verify-with-llm',
+  STORE_FINANCIAL_TRANSACTION: 'store-financial-transaction',
   HANDLE_COMPLETED_ANALYSIS: 'handle-completed-analysis',
 } as const;

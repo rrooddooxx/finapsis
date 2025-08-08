@@ -10,17 +10,22 @@ services:
       - REDIS_LOG_LEVEL=notice
     volumes:
       - redis_data:/data
-      - ./redis-dev.conf:/usr/local/etc/redis/redis.conf:ro
     ports:
       - "6379:6379"
 
   redis-commander:
-    profiles: [ ]
+    image: rediscommander/redis-commander:latest
     environment:
       - REDIS_HOSTS=local:redis:6379
       - HTTP_USER=dev
       - HTTP_PASSWORD=dev123
       - LOG_LEVEL=info
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - finapsis
 
   redis-cli:
     image: redis:7.2-alpine
@@ -30,8 +35,11 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - financial_network
+      - finapsis
     profiles:
       - cli # Start with: docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile cli up
     stdin_open: true
     tty: true
+
+volumes:
+  redis_data: {}

@@ -23,4 +23,5 @@ AppRouter.get('/api/status', (c) => {
 
 AppRouter.route("/api", ChatRouter);
 AppRouter.route("/api/knowledge", KnowledgeRouter);
+AppRouter.route("/api", ChatRouter);
 export default AppRouter;

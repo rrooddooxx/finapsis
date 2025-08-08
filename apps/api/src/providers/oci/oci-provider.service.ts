@@ -141,8 +141,15 @@ Current error: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
     createAIDocumentClient(): aidocument.AIServiceDocumentClient {
         console.log(`🏥 Creating AI Document client with authentication...`);
+        
+        const provider = this.getProvider();
+        const region = provider.getRegion?.() || Bun.env.OCI_REGION || 'us-phoenix-1';
+        
+        console.log(`🌍 Using OCI region: ${region}`);
+        console.log(`🔑 Authentication provider type: ${provider.constructor.name}`);
+        
         return new aidocument.AIServiceDocumentClient({
-            authenticationDetailsProvider: this.getProvider()
+            authenticationDetailsProvider: provider
         });
     }
 
