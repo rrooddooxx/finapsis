@@ -13,9 +13,10 @@ import {DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls} from 
 
 interface ChatScreenProps extends ScreenProps {
     onboardingData?: OnboardingData
+    userEmail?: string
 }
 
-export function ChatScreen({onStateChange, onboardingData}: ChatScreenProps) {
+export function ChatScreen({onStateChange, onboardingData, userEmail}: ChatScreenProps) {
     const [input, setInput] = useState("")
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -23,6 +24,9 @@ export function ChatScreen({onStateChange, onboardingData}: ChatScreenProps) {
     const {messages, sendMessage, status} = useChat({
         transport: new DefaultChatTransport({
             api: `${import.meta.env.VITE_BACKEND_API_URL}/api/chat/ui`,
+            headers: {
+                'X-User-Email': userEmail || 'demo-user'
+            }
         }),
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls
     })

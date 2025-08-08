@@ -9,6 +9,7 @@ import {WelcomeScreen} from "@/components/screens/welcome.screen.tsx";
 
 function App() {
     const [appState, setAppState] = useState<AppState>("welcome")
+    const [userEmail, setUserEmail] = useState<string>("")
     const [onboardingData, setOnboardingData] = useState<OnboardingData>({
         name: "",
         goal: "",
@@ -31,6 +32,7 @@ function App() {
         await new Promise((resolve) => setTimeout(resolve, 1500))
 
         if (loginData.email && loginData.password.length >= 6) {
+            setUserEmail(loginData.email)
             setAppState("chat")
             const loginWelcomeMessage: Message = {
                 id: messages.length + 1,
@@ -101,6 +103,7 @@ function App() {
                 <ChatScreen
                     onStateChange={handleStateChange}
                     onboardingData={onboardingData}
+                    userEmail={userEmail}
                 />
             )
 

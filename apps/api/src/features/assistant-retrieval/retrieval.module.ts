@@ -1,16 +1,16 @@
-import { createResource } from "./actions/resources";
-import { generateEmbedding, generateEmbeddings, findRelevantContent } from "./services/embedding.service";
+import { createPersonalKnowledge } from "./actions/personal-knowledge";
+import { generateEmbedding, generateEmbeddings, getPersonalKnowledge } from "./services/embedding.service";
 
 export enum RetrievalService {
-    CREATE_RESOURCE = 'CREATE_RESOURCE',
     GENERATE_EMBEDDING = 'GENERATE_EMBEDDING',
     GENERATE_EMBEDDINGS = 'GENERATE_EMBEDDINGS',
-    FIND_RELEVANT_CONTENT = 'FIND_RELEVANT_CONTENT',
+    CREATE_PERSONAL_KNOWLEDGE = 'CREATE_PERSONAL_KNOWLEDGE',
+    GET_PERSONAL_KNOWLEDGE = 'GET_PERSONAL_KNOWLEDGE',
 }
 
 export const RetrievalModule = {
-    [RetrievalService.CREATE_RESOURCE]: createResource,
     [RetrievalService.GENERATE_EMBEDDING]: generateEmbedding,
     [RetrievalService.GENERATE_EMBEDDINGS]: generateEmbeddings,
-    [RetrievalService.FIND_RELEVANT_CONTENT]: findRelevantContent,
+    [RetrievalService.CREATE_PERSONAL_KNOWLEDGE]: createPersonalKnowledge,
+    [RetrievalService.GET_PERSONAL_KNOWLEDGE]: getPersonalKnowledge,
 }
