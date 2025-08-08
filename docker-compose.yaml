@@ -18,7 +18,6 @@ services:
     networks:
       - financial_network
 
-  # Optional: Redis Commander for Redis GUI management
   redis-commander:
     image: rediscommander/redis-commander:latest
     container_name: financial-assistant-redis-ui
@@ -36,7 +35,7 @@ services:
     networks:
       - financial_network
     profiles:
-      - tools # Only start with: docker-compose --profile tools up
+      - tools #  start with: docker-compose --profile tools up
 
 volumes:
   redis_data:

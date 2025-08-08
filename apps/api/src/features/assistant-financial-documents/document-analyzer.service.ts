@@ -77,7 +77,7 @@ export class DocumentAnalyzerService {
                 document: documentDetails,
                 compartmentId: request.compartmentId || docAIConfig.compartmentId,
                 documentType: documentType,
-                language: config.language || 'en'
+                language: config.language || 'es'
             };
 
             // Add output location if configured
@@ -106,7 +106,7 @@ export class DocumentAnalyzerService {
                 if (obj.analyzeDocumentResult && typeof obj.analyzeDocumentResult === 'object') {
                     devLogger("📋 Synchronous response detected - processing immediate results");
                     const extractedData = await this.parseAnalysisResults(obj.analyzeDocumentResult);
-                    
+
                     return {
                         status: 'completed',
                         extractedData
@@ -193,7 +193,7 @@ export class DocumentAnalyzerService {
         const defaultFeatures = financialDocumentsConfig.getFeaturesForDocumentType('default');
         return {
             features: defaultFeatures,
-            language: 'en',
+            language: 'es',
             includeOutputLocation: true
         };
     }
@@ -213,7 +213,7 @@ export class DocumentAnalyzerService {
             const supportedTypes = ['INVOICE', 'RECEIPT', 'BANK_STATEMENT', 'CHECK', 'PAYSLIP', 'TAX_FORM'];
             return supportedTypes.includes(documentType || '');
         }
-        
+
         // All other features are supported for all document types
         return true;
     }
