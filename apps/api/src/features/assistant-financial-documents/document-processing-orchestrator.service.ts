@@ -104,7 +104,12 @@ export class DocumentProcessingOrchestrator {
         });
 
         if (conversionResult.success && conversionResult.imageData.length > 0) {
-          // Analyze the first image (or all images for multi-page documents)
+          // Log multi-page info
+          if (conversionResult.imageData.length > 1) {
+            devLogger('DocumentProcessingOrchestrator', `📄 Multi-page document detected: ${conversionResult.imageData.length} pages. Analyzing first page for efficiency.`);
+          }
+          
+          // Analyze the first page (most important for financial documents)
           const firstImage = conversionResult.imageData[0];
           visionAnalysisResult = await openAIVisionService.analyzeDocumentImage({
             imageBase64: firstImage.base64,

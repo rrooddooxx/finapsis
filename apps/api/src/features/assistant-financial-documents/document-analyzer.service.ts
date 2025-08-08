@@ -91,14 +91,7 @@ export class DocumentAnalyzerService {
                 language: config.language || 'es'
             };
 
-            // Add output location if configured
-            if (config.includeOutputLocation !== false) {
-                analyzeDocumentDetails.outputLocation = {
-                    namespaceName: docAIConfig.namespace || request.namespace,
-                    bucketName: docAIConfig.resultsbucket || request.bucketName,
-                    prefix: `results/${Date.now()}_${request.objectName}`
-                };
-            }
+            // Note: No outputLocation needed - processing via streaming from upload bucket directly
 
             devLogger("🔄 OCI Document AI request payload:", JSON.stringify(analyzeDocumentDetails, null, 2));
 
@@ -151,11 +144,29 @@ export class DocumentAnalyzerService {
             };
 
         } catch (error) {
-            devLogger("❌ Error analyzing document:", JSON.stringify(error));
+            // Enhanced error logging to debug OCI API issues
+            let errorDetails: any = {
+                message: error instanceof Error ? error.message : String(error),
+                type: error?.constructor?.name || 'UnknownError'
+            };
+
+            // If it's an OCI SDK error, try to extract more details
+            if (typeof error === 'object' && error !== null) {
+                errorDetails = {
+                    ...errorDetails,
+                    statusCode: (error as any).statusCode,
+                    code: (error as any).code,
+                    opcRequestId: (error as any).opcRequestId,
+                    targetService: (error as any).targetService,
+                    operationName: (error as any).operationName
+                };
+            }
+
+            devLogger("❌ OCI Document AI error details:", JSON.stringify(errorDetails, null, 2));
 
             return {
                 status: 'failed',
-                error: error instanceof Error ? error.message : 'Unknown error'
+                error: error instanceof Error ? error.message : String(error)
             };
         }
     }

@@ -2,6 +2,10 @@ import { devLogger } from "../../utils/logger.utils";
 import { ociProviderService } from "../../providers/oci/oci-provider.service";
 import { financialDocumentsConfig } from "./assistant-financial-documents.config";
 import { pdfConverterService } from "./pdf-converter.service";
+const pdf2pic = require("pdf2pic");
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 export interface DocumentConversionRequest {
   bucketName: string;
@@ -60,23 +64,30 @@ export class DocumentConverterService {
 
       // Handle PDF conversion
       if (mimeType === 'application/pdf') {
-        devLogger('DocumentConverter', '📄 Converting PDF to images using dedicated PDF converter');
+        devLogger('DocumentConverter', '📄 Converting PDF to images for Vision API analysis');
         
-        const pdfConversionResult = await pdfConverterService.convertPdfToImages(request);
-        
-        // Convert PDF result URLs to base64 data (this will need PDF converter update)
-        const imageData = pdfConversionResult.success ? 
-          [] : // TODO: Convert PDF result to base64 format
-          [];
-        
-        return {
-          success: pdfConversionResult.success,
-          imageData,
-          originalFormat: mimeType,
-          conversionMethod: 'pdf-conversion',
-          processingTime: Date.now() - startTime,
-          error: pdfConversionResult.error
-        };
+        try {
+          const pdfBuffer = await this.downloadFileFromStorage(request);
+          const imageData = await this.convertPdfToBase64Images(pdfBuffer, request.objectName);
+          
+          return {
+            success: true,
+            imageData,
+            originalFormat: mimeType,
+            conversionMethod: 'pdf-conversion',
+            processingTime: Date.now() - startTime
+          };
+        } catch (error) {
+          devLogger('DocumentConverter', `❌ PDF conversion failed: ${error}`);
+          return {
+            success: false,
+            imageData: [],
+            originalFormat: mimeType,
+            conversionMethod: 'pdf-conversion',
+            processingTime: Date.now() - startTime,
+            error: error instanceof Error ? error.message : 'PDF conversion failed'
+          };
+        }
       }
 
       // Unsupported format
@@ -265,6 +276,79 @@ export class DocumentConverterService {
       isValid: issues.length === 0,
       issues
     };
+  }
+
+  /**
+   * Convert PDF buffer to base64 images using pdf2pic
+   */
+  private async convertPdfToBase64Images(pdfBuffer: Buffer, fileName: string): Promise<Array<{base64: string, mimeType: string, fileName?: string}>> {
+    const tempDir = path.join(os.tmpdir(), 'pdf-conversion');
+    const tempPdfPath = path.join(tempDir, `temp_${Date.now()}.pdf`);
+
+    try {
+      // Ensure temp directory exists
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      // Write PDF buffer to temp file
+      fs.writeFileSync(tempPdfPath, pdfBuffer);
+
+      devLogger('DocumentConverter', `🔄 Converting PDF: ${fileName} (${Math.round(pdfBuffer.length / 1024)}KB)`);
+
+      // Configure pdf2pic
+      const convert = pdf2pic.fromPath(tempPdfPath, {
+        density: 300,           // DPI for better quality
+        saveFilename: 'page',
+        savePath: tempDir,
+        format: 'png',
+        width: 2000,
+        height: 2000,
+        quality: 85
+      });
+
+      // Convert all pages to images
+      const conversionResults = await convert.bulk(-1, { responseType: 'buffer' });
+      
+      devLogger('DocumentConverter', `✅ PDF converted to ${conversionResults.length} pages`);
+
+      // Convert each page to base64
+      const imageData = conversionResults.map((result: any, index: number) => {
+        const imageBuffer = result.buffer;
+        if (!imageBuffer) {
+          throw new Error(`Failed to get buffer for page ${index + 1}`);
+        }
+
+        const base64 = imageBuffer.toString('base64');
+        return {
+          base64,
+          mimeType: 'image/png',
+          fileName: `${fileName}_page_${index + 1}.png`
+        };
+      });
+
+      return imageData;
+
+    } catch (error) {
+      devLogger('DocumentConverter', `❌ PDF conversion error: ${error}`);
+      throw new Error(`PDF to image conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      // Clean up temp files
+      try {
+        if (fs.existsSync(tempPdfPath)) {
+          fs.unlinkSync(tempPdfPath);
+        }
+        // Clean up any generated image files
+        const files = fs.readdirSync(tempDir);
+        files.forEach(file => {
+          if (file.startsWith('page') && file.endsWith('.png')) {
+            fs.unlinkSync(path.join(tempDir, file));
+          }
+        });
+      } catch (cleanupError) {
+        devLogger('DocumentConverter', `⚠️ Cleanup warning: ${cleanupError}`);
+      }
+    }
   }
 }
 
