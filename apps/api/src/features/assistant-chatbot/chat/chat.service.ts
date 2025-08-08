@@ -32,6 +32,20 @@ CONTEXTO CHILENO:
 - Entiende términos como "lucas", "palos", UF, UTM
 - Considera el costo de vida y salarios típicos en Chile
 
+NUEVAS CAPACIDADES FINANCIERAS:
+- QUERY_FINANCIAL_TRANSACTIONS: Puedes consultar las transacciones financieras guardadas del usuario
+- CONFIRM_TRANSACTION: Puedes detectar cuando el usuario confirma o rechaza transacciones con "si"/"no"
+- Ejemplos de consultas que puedes responder:
+  * "¿Cuánto gasté en electrónica este mes?" → usar QUERY_FINANCIAL_TRANSACTIONS con category="electronica"
+  * "¿Cuál fue mi último gasto en PC Factory?" → usar QUERY_FINANCIAL_TRANSACTIONS con merchant="PC Factory"
+  * "Muéstrame mis gastos de más de $50.000" → usar QUERY_FINANCIAL_TRANSACTIONS con amountFrom=50000
+  * "¿Cuánto he gastado en total?" → usar QUERY_FINANCIAL_TRANSACTIONS con summaryOnly=true
+
+DETECCIÓN DE CONFIRMACIONES DE TRANSACCIONES:
+- Si el usuario responde "si", "sí", "yes", "ok", "confirmar", "correcto" → usar CONFIRM_TRANSACTION con confirmed=true
+- Si el usuario responde "no", "nope", "cancelar", "incorrecto", "error" → usar CONFIRM_TRANSACTION con confirmed=false
+- SIEMPRE usar CONFIRM_TRANSACTION cuando detectes estas palabras clave en el contexto de transacciones
+
 FUNCIONAMIENTO CON CITAS Y REFLEXIONES:
 - OBLIGATORIO: Para TODA pregunta del usuario, SIEMPRE usa AMBAS herramientas:
   1. PRIMERO usa GET_PERSONAL_KNOWLEDGE con userId "USER_ID_PLACEHOLDER" para buscar información personal
@@ -49,7 +63,7 @@ FUNCIONAMIENTO CON CITAS Y REFLEXIONES:
 - Si el usuario pregunta por sus metas o progreso, usa GET_PERSONAL_GOALS con userId "USER_ID_PLACEHOLDER"
 - Si el usuario quiere actualizar el progreso de una meta, usa UPDATE_PERSONAL_GOAL con userId "USER_ID_PLACEHOLDER"
 - Si te preguntan sobre indicadores económicos, usa la herramienta disponible
-- CONSEJOS FINANCIEROS: Ahora puedes dar consejos más personalizados ya que tienes acceso a conocimiento general + personal + metas del usuario
+- CONSEJOS FINANCIEROS: Ahora puedes dar consejos más personalizados ya que tienes acceso a conocimiento general + personal + metas del usuario + historial de transacciones
 - Ejemplos que requieren ADD_PERSONAL_KNOWLEDGE: "Gano 500 mil pesos", "Mi gasto en comida es 100 mil", "Quiero ahorrar para una casa", "Tengo una deuda de 2 millones"
 - Ejemplos que requieren CREATE_PERSONAL_GOAL: "Quiero ahorrar 5 millones para un auto", "Mi meta es reducir mi deuda a la mitad este año", "Quiero invertir 100 mil mensuales"
 - Las respuestas de consejos financieros NO se almacenan, solo las metas y datos personales
@@ -65,7 +79,9 @@ export const callChatOnIncomingMessage = async ({input, messages, userId = 'demo
         [AssistantTool.CREATE_PERSONAL_GOAL]: AssistantTools[AssistantTool.CREATE_PERSONAL_GOAL],
         [AssistantTool.GET_PERSONAL_GOALS]: AssistantTools[AssistantTool.GET_PERSONAL_GOALS],
         [AssistantTool.UPDATE_PERSONAL_GOAL]: AssistantTools[AssistantTool.UPDATE_PERSONAL_GOAL],
-        [AssistantTool.GET_GENERAL_KNOWLEDGE]: AssistantTools[AssistantTool.GET_GENERAL_KNOWLEDGE]
+        [AssistantTool.GET_GENERAL_KNOWLEDGE]: AssistantTools[AssistantTool.GET_GENERAL_KNOWLEDGE],
+        [AssistantTool.QUERY_FINANCIAL_TRANSACTIONS]: AssistantTools[AssistantTool.QUERY_FINANCIAL_TRANSACTIONS],
+        [AssistantTool.CONFIRM_TRANSACTION]: AssistantTools[AssistantTool.CONFIRM_TRANSACTION]
     };
 
     const prompts: ModelMessage[] = [{

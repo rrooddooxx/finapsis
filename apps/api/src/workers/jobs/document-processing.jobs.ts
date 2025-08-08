@@ -91,15 +91,81 @@ export interface DocumentProcessingCompletedJobData {
   error?: string;
 }
 
+export interface DocumentConfirmationJobData {
+  // Processing Results to be confirmed
+  processingLogId: string;
+  userId: string;
+  
+  // Transaction Details for User Confirmation
+  transactionDetails: {
+    transactionType: 'INCOME' | 'EXPENSE';
+    category: string;
+    subcategory?: string;
+    amount: number;
+    currency: string;
+    transactionDate: Date;
+    description: string;
+    merchant?: string;
+    confidence: number;
+  };
+  
+  // Analysis Context for Storage
+  analysisContext: {
+    documentId: string;
+    extractedData: any;
+    classificationResult: any;
+    llmVerificationResult?: any;
+    visionAnalysisResult?: any;
+    processingTime: number;
+  };
+  
+  // Original Upload Context
+  uploadJobData: DocumentUploadJobData;
+  
+  // Confirmation Settings
+  expiryTime?: Date; // Auto-confirm after X time if no response
+  retryCount?: number;
+}
+
+export interface TransactionConfirmationResponseJobData {
+  // Reference to original confirmation
+  confirmationJobId: string;
+  processingLogId: string;
+  userId: string;
+  
+  // User Response
+  confirmed: boolean; // true for "si", false for "no"
+  userMessage?: string; // Original user message that contained the response
+  
+  // Transaction Data to Store (if confirmed)
+  transactionData?: {
+    documentId: string;
+    transactionType: 'INCOME' | 'EXPENSE';
+    category: string;
+    subcategory?: string;
+    amount: number;
+    currency: string;
+    transactionDate: Date;
+    description: string;
+    merchant?: string;
+    confidence: number;
+    metadata?: Record<string, any>;
+  };
+}
+
 export type DocumentProcessingJob = Job<DocumentUploadJobData>;
 export type DocumentAnalysisJob = Job<DocumentAnalysisJobData>;
 export type DocumentCompletedJob = Job<DocumentProcessingCompletedJobData>;
+export type DocumentConfirmationJob = Job<DocumentConfirmationJobData>;
+export type TransactionConfirmationResponseJob = Job<TransactionConfirmationResponseJobData>;
 
 // Job Queue Names
 export const JOB_QUEUES = {
   DOCUMENT_UPLOAD: 'document-upload',
   DOCUMENT_ANALYSIS: 'document-analysis', 
   DOCUMENT_COMPLETED: 'document-completed',
+  DOCUMENT_CONFIRMATION: 'document-confirmation',
+  TRANSACTION_CONFIRMATION_RESPONSE: 'transaction-confirmation-response',
 } as const;
 
 // Job Types
@@ -110,4 +176,6 @@ export const JOB_TYPES = {
   VERIFY_WITH_LLM: 'verify-with-llm',
   STORE_FINANCIAL_TRANSACTION: 'store-financial-transaction',
   HANDLE_COMPLETED_ANALYSIS: 'handle-completed-analysis',
+  REQUEST_USER_CONFIRMATION: 'request-user-confirmation',
+  PROCESS_CONFIRMATION_RESPONSE: 'process-confirmation-response',
 } as const;

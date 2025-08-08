@@ -4,6 +4,8 @@ import {
   DocumentAnalysisJobData,
   DocumentProcessingCompletedJobData,
   DocumentUploadJobData,
+  DocumentConfirmationJobData,
+  TransactionConfirmationResponseJobData,
   JOB_QUEUES,
   JOB_TYPES
 } from '../jobs/document-processing.jobs';
@@ -12,6 +14,8 @@ export class QueueService {
     private readonly documentUploadQueue: Queue<DocumentUploadJobData>;
     private readonly documentAnalysisQueue: Queue<DocumentAnalysisJobData>;
     private readonly documentCompletedQueue: Queue<DocumentProcessingCompletedJobData>;
+    private readonly documentConfirmationQueue: Queue<DocumentConfirmationJobData>;
+    private readonly transactionConfirmationResponseQueue: Queue<TransactionConfirmationResponseJobData>;
     private readonly connection: ConnectionOptions;
 
     constructor() {
@@ -41,6 +45,8 @@ export class QueueService {
         this.documentUploadQueue = new Queue(JOB_QUEUES.DOCUMENT_UPLOAD, queueOptions);
         this.documentAnalysisQueue = new Queue(JOB_QUEUES.DOCUMENT_ANALYSIS, queueOptions);
         this.documentCompletedQueue = new Queue(JOB_QUEUES.DOCUMENT_COMPLETED, queueOptions);
+        this.documentConfirmationQueue = new Queue(JOB_QUEUES.DOCUMENT_CONFIRMATION, queueOptions);
+        this.transactionConfirmationResponseQueue = new Queue(JOB_QUEUES.TRANSACTION_CONFIRMATION_RESPONSE, queueOptions);
 
         devLogger('Queue Service', '📋 BullMQ queues initialized');
     }
@@ -95,6 +101,34 @@ export class QueueService {
         return job;
     }
 
+    // Add document confirmation request job (for user confirmation flow)
+    async addDocumentConfirmationJob(data: DocumentConfirmationJobData) {
+        const job = await this.documentConfirmationQueue.add(
+            JOB_TYPES.REQUEST_USER_CONFIRMATION,
+            data,
+            {
+                jobId: `confirmation-${data.processingLogId}-${Date.now()}`,
+            }
+        );
+
+        devLogger('Queue Service', `📋 Document confirmation job added: ${job.id}`);
+        return job;
+    }
+
+    // Add transaction confirmation response job (when user responds with si/no)
+    async addTransactionConfirmationResponseJob(data: TransactionConfirmationResponseJobData) {
+        const job = await this.transactionConfirmationResponseQueue.add(
+            JOB_TYPES.PROCESS_CONFIRMATION_RESPONSE,
+            data,
+            {
+                jobId: `response-${data.confirmationJobId}-${Date.now()}`,
+            }
+        );
+
+        devLogger('Queue Service', `📋 Transaction confirmation response job added: ${job.id}`);
+        return job;
+    }
+
     // Get queue instances for worker registration
     getDocumentUploadQueue() {
         return this.documentUploadQueue;
@@ -108,16 +142,28 @@ export class QueueService {
         return this.documentCompletedQueue;
     }
 
+    getDocumentConfirmationQueue() {
+        return this.documentConfirmationQueue;
+    }
+
+    getTransactionConfirmationResponseQueue() {
+        return this.transactionConfirmationResponseQueue;
+    }
+
     // Health check for queues
     async getQueueStats() {
         const uploadStats = await this.documentUploadQueue.getJobCounts();
         const analysisStats = await this.documentAnalysisQueue.getJobCounts();
         const completedStats = await this.documentCompletedQueue.getJobCounts();
+        const confirmationStats = await this.documentConfirmationQueue.getJobCounts();
+        const responseStats = await this.transactionConfirmationResponseQueue.getJobCounts();
 
         return {
             documentUpload: uploadStats,
             documentAnalysis: analysisStats,
             documentCompleted: completedStats,
+            documentConfirmation: confirmationStats,
+            transactionConfirmationResponse: responseStats,
         };
     }
 
@@ -128,6 +174,8 @@ export class QueueService {
         await this.documentUploadQueue.close();
         await this.documentAnalysisQueue.close();
         await this.documentCompletedQueue.close();
+        await this.documentConfirmationQueue.close();
+        await this.transactionConfirmationResponseQueue.close();
 
         devLogger('Queue Service', '📋 BullMQ queues closed');
     }
