@@ -51,34 +51,34 @@ export interface VisionAnalysisResult {
 
 // Zod schema for structured output
 const VisionAnalysisSchema = z.object({
-  extractedText: z.string().describe("Complete text extracted from the image"),
-  amounts: z.array(z.number()).describe("All numeric amounts found in the document, sorted by relevance"),
-  dates: z.array(z.string()).describe("All dates found in the document in ISO format"),
+  extractedText: z.string().default('').describe("Complete text extracted from the image"),
+  amounts: z.array(z.number()).default([]).describe("All numeric amounts found in the document, sorted by relevance"),
+  dates: z.array(z.string()).default([]).describe("All dates found in the document in ISO format"),
   merchantInfo: z.object({
-    merchantName: z.string().describe("Name of the merchant or business"),
+    merchantName: z.string().default('Unknown').describe("Name of the merchant or business"),
     rut: z.string().optional().describe("Chilean RUT number if present"),
     giro: z.string().optional().describe("Business activity description"),
     address: z.string().optional().describe("Business address"),
     city: z.string().optional().describe("City location"),
-    confidence: z.number().min(0).max(1).describe("Confidence in merchant identification")
-  }),
+    confidence: z.number().min(0).max(1).default(0).describe("Confidence in merchant identification")
+  }).default({ merchantName: 'Unknown', confidence: 0 }),
   transactionInfo: z.object({
-    transactionType: z.enum(['INCOME', 'EXPENSE']).describe("Type of financial transaction"),
-    category: z.string().describe("Category of expense/income (Chilean context)"),
+    transactionType: z.enum(['INCOME', 'EXPENSE']).default('EXPENSE').describe("Type of financial transaction"),
+    category: z.string().default('otros_gastos').describe("Category of expense/income (Chilean context)"),
     subcategory: z.string().optional().describe("More specific subcategory"),
-    amount: z.number().describe("Main transaction amount"),
+    amount: z.number().default(0).describe("Main transaction amount"),
     currency: z.string().default('CLP').describe("Currency code"),
-    description: z.string().describe("Transaction description"),
-    confidence: z.number().min(0).max(1).describe("Confidence in classification")
-  }),
+    description: z.string().default('').describe("Transaction description"),
+    confidence: z.number().min(0).max(1).default(0).describe("Confidence in classification")
+  }).default({ transactionType: 'EXPENSE', category: 'otros_gastos', amount: 0, currency: 'CLP', description: '', confidence: 0 }),
   chileanContext: z.object({
-    documentType: z.enum(['BOLETA', 'FACTURA', 'COMPROBANTE', 'RECIBO', 'TRANSFERENCIA', 'UNKNOWN']),
-    isChileanDocument: z.boolean().describe("Whether this appears to be a Chilean document"),
-    language: z.enum(['es', 'en', 'mixed']).describe("Primary language of the document"),
-    hasRUT: z.boolean().describe("Whether a Chilean RUT is present"),
-    hasIVA: z.boolean().describe("Whether IVA (Chilean tax) is mentioned")
-  }),
-  confidence: z.number().min(0).max(1).describe("Overall confidence in the analysis")
+    documentType: z.enum(['BOLETA', 'FACTURA', 'COMPROBANTE', 'RECIBO', 'TRANSFERENCIA', 'UNKNOWN']).default('UNKNOWN'),
+    isChileanDocument: z.boolean().default(false).describe("Whether this appears to be a Chilean document"),
+    language: z.enum(['es', 'en', 'mixed']).default('es').describe("Primary language of the document"),
+    hasRUT: z.boolean().default(false).describe("Whether a Chilean RUT is present"),
+    hasIVA: z.boolean().default(false).describe("Whether IVA (Chilean tax) is mentioned")
+  }).default({ documentType: 'UNKNOWN', isChileanDocument: false, language: 'es', hasRUT: false, hasIVA: false }),
+  confidence: z.number().min(0).max(1).default(0).describe("Overall confidence in the analysis")
 });
 
 export class OpenAIVisionService {

@@ -13,6 +13,8 @@ declare module "bun" {
 
         // OCI Object Storage
         OCI_NAMESPACE: string;
+        OCI_DOCUMENTS_BUCKET_NAME: string;
+        OCI_DOCUMENTS_BUCKET_OCID: string;
         OCI_RESULTS_BUCKET?: string;
 
         // OCI Streaming
