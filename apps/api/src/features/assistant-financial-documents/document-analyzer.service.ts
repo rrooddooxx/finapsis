@@ -43,6 +43,17 @@ export interface DocumentAnalysisResult {
             categories: string[];
             merchant: string | null;
         };
+        documentClassification?: {
+            documentType: string;
+            confidence: number;
+            categories: string[];
+            language?: string;
+        };
+        metadata?: {
+            pageCount?: number;
+            mimeType?: string;
+            extractedAt?: string;
+        };
     };
     error?: string;
 }
@@ -191,8 +202,14 @@ export class DocumentAnalyzerService {
 
     private getDefaultAnalysisConfig(): DocumentAnalysisConfig {
         const defaultFeatures = financialDocumentsConfig.getFeaturesForDocumentType('default');
+        // Always include document classification for financial documents
+        const featuresWithClassification = [
+            ...defaultFeatures,
+            { type: 'DOCUMENT_CLASSIFICATION' as DocumentAnalysisFeatureType, maxResults: 10 }
+        ];
+        
         return {
-            features: defaultFeatures,
+            features: featuresWithClassification,
             language: 'es',
             includeOutputLocation: true
         };
@@ -212,6 +229,13 @@ export class DocumentAnalyzerService {
         if (featureType === 'KEY_VALUE_DETECTION') {
             const supportedTypes = ['INVOICE', 'RECEIPT', 'BANK_STATEMENT', 'CHECK', 'PAYSLIP', 'TAX_FORM'];
             return supportedTypes.includes(documentType || '');
+        }
+        
+        // TABLE_EXTRACTION is not supported for Spanish documents in OCI
+        // Skip table extraction for Spanish/Chilean documents to avoid errors
+        if (featureType === 'TABLE_EXTRACTION') {
+            devLogger('DocumentAnalyzer', '⚠️ Skipping TABLE_EXTRACTION for Spanish documents due to OCI limitations');
+            return false;
         }
 
         // All other features are supported for all document types
@@ -261,8 +285,8 @@ export class DocumentAnalyzerService {
 
             // Clean up the extracted text
             extractedText = extractedText.trim();
-            devLogger("📝 Extracted text length:", extractedText.length, "characters");
-            devLogger("📄 Extracted text preview:", extractedText.substring(0, 200) + "...");
+            devLogger('DocumentAnalyzer', `📝 Extracted text length: ${extractedText.length} characters`);
+            devLogger('DocumentAnalyzer', `📄 Extracted text preview: ${extractedText.substring(0, 200)}...`);
 
             const extractedData = {
                 text: extractedText,
@@ -280,7 +304,7 @@ export class DocumentAnalyzerService {
             return extractedData;
 
         } catch (error) {
-            devLogger("❌ Error parsing analysis results:", error);
+            devLogger('DocumentAnalyzer', `❌ Error parsing analysis results: ${error}`);
             return null;
         }
     }
@@ -295,9 +319,39 @@ export class DocumentAnalyzerService {
     }
 
     private extractAmounts(text: string): number[] {
-        const amountRegex = /\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g;
-        const matches = text.match(amountRegex) || [];
-        return matches.map(match => parseFloat(match.replace(/[$,]/g, '')));
+        // Improved Chilean peso amount patterns
+        const amountPatterns = [
+            // Chilean peso with period separators: 345.980, $345.980
+            /\$?(\d{1,3}(?:\.\d{3})+(?:,\d{2})?)/g,
+            // Standard formats: $345,980.00, 345,980.00
+            /\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g,
+            // Simple numbers that might be amounts (3+ digits)
+            /\b(\d{3,})\b/g
+        ];
+        
+        const foundAmounts = new Set<number>();
+        
+        for (const pattern of amountPatterns) {
+            const matches = text.match(pattern) || [];
+            for (const match of matches) {
+                // Clean and parse the number
+                let cleanAmount = match.replace(/[$,]/g, '');
+                
+                // Handle Chilean format (periods as thousands separator)
+                if (cleanAmount.includes('.') && !cleanAmount.match(/\.\d{2}$/)) {
+                    // This is likely a thousands separator, not decimal
+                    cleanAmount = cleanAmount.replace(/\./g, '');
+                }
+                
+                const amount = parseFloat(cleanAmount);
+                if (!isNaN(amount) && amount >= 1) {
+                    foundAmounts.add(amount);
+                }
+            }
+        }
+        
+        // Return sorted amounts (largest first)
+        return Array.from(foundAmounts).sort((a, b) => b - a);
     }
 
     private extractDates(text: string): string[] {
