@@ -13,4 +13,6 @@ export type JobData = {
   scheduledFor: string;
   isRecurring: boolean;
   recurringPattern?: string;
+  repetitionNumber?: number; // For limited repeats: 1, 2, 3, 4
+  totalRepetitions?: number; // For limited repeats: total count
 }

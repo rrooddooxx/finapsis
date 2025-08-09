@@ -8,7 +8,8 @@ export const reminderExtractionSchema = z.object({
     timestamp: z.number(),
   }),
   isRecurring: z.boolean(),
-  recurringPattern: z.string().optional()
+  recurringPattern: z.string().optional(),
+  repeatCount: z.number().optional() // For limited repetitions like "4 veces"
 });
 
 export const reminderExtractionInputSchema = z.object({

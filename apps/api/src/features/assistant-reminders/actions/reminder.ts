@@ -33,6 +33,7 @@ export const createReminderAction = async ({ userMessage, userId }: ReminderExtr
         1. Extrae el mensaje/tarea a recordar
         2. Calcula cuándo debe ejecutarse (timestamp Unix)
         3. Determina si es recurrente
+        4. Si menciona un número de veces (ej: "4 veces"), extrae ese número
         
         Para tiempo relativo:
         - "en 2 horas" = ahora + 2 horas
@@ -42,6 +43,7 @@ export const createReminderAction = async ({ userMessage, userId }: ReminderExtr
         Para recurrente:
         - "todos los 20 de cada mes" = recurring, próximo día 20
         - "cada semana" = recurring, mismo día siguiente semana
+        - "cada 30 segundos, 4 veces" = recurring con repeatCount: 4
         
         Timestamp actual: ${currentTime}
       `,
@@ -68,27 +70,80 @@ export const createReminderAction = async ({ userMessage, userId }: ReminderExtr
       recurringPattern: reminderData.recurringPattern,
     };
     
-    const job = await reminderQueue.add(
-      'send-reminder',
-      jobData,
-      {
-        delay,
-        // Solo agregar repeat si es recurrente
-        ...(reminderData.isRecurring && {
-          repeat: { 
-            pattern: convertToChronPattern(reminderData.recurringPattern) 
-          }
-        }),
-        removeOnComplete: 10, // Solo guardar los últimos 10 completados
-        removeOnFail: 5, // Solo guardar los últimos 5 fallidos
+    let job;
+    
+    if (reminderData.isRecurring && reminderData.repeatCount) {
+      // For limited repeats, create individual jobs instead of using cron repeat
+      const cronPattern = convertToChronPattern(reminderData.recurringPattern);
+      if (cronPattern) {
+        // Parse the interval from the pattern to calculate delays
+        let intervalMs = 60000; // Default 1 minute
+        
+        // Extract interval from pattern for seconds/minutes
+        if (reminderData.recurringPattern?.includes('segundo')) {
+          const match = reminderData.recurringPattern.match(/(\d+)\s*segundo/);
+          intervalMs = match ? parseInt(match[1]) * 1000 : 60000;
+        } else if (reminderData.recurringPattern?.includes('minuto')) {
+          const match = reminderData.recurringPattern.match(/(\d+)\s*minuto/);
+          intervalMs = match ? parseInt(match[1]) * 60000 : 60000;
+        } else if (reminderData.recurringPattern?.includes('hora')) {
+          const match = reminderData.recurringPattern.match(/(\d+)\s*hora/);
+          intervalMs = match ? parseInt(match[1]) * 3600000 : 3600000;
+        }
+        
+        // Create multiple individual jobs with increasing delays
+        const jobs = [];
+        for (let i = 0; i < reminderData.repeatCount; i++) {
+          const jobDelay = delay + (i * intervalMs);
+          const individualJob = await reminderQueue.add(
+            'send-reminder',
+            {
+              ...jobData,
+              repetitionNumber: i + 1,
+              totalRepetitions: reminderData.repeatCount
+            },
+            {
+              delay: jobDelay,
+              removeOnComplete: 10,
+              removeOnFail: 5,
+            }
+          );
+          jobs.push(individualJob);
+        }
+        job = jobs[0]; // Return first job for response
+      } else {
+        // Fallback to single job if pattern conversion fails
+        job = await reminderQueue.add('send-reminder', jobData, { delay });
       }
-    );
+    } else {
+      // Regular job (single or infinite recurring)
+      job = await reminderQueue.add(
+        'send-reminder',
+        jobData,
+        {
+          delay,
+          // Solo agregar repeat si es recurrente y sin límite
+          ...(reminderData.isRecurring && !reminderData.repeatCount && {
+            repeat: { 
+              pattern: convertToChronPattern(reminderData.recurringPattern)
+            }
+          }),
+          removeOnComplete: 10,
+          removeOnFail: 5,
+        }
+      );
+    }
 
-    console.log(`✅ Recordatorio programado para ${new Date(reminderData.when.timestamp).toLocaleString('es-ES')}`)
+    const scheduledTime = new Date(reminderData.when.timestamp).toLocaleString('es-ES');
+    const repeatInfo = reminderData.isRecurring && reminderData.repeatCount 
+      ? ` (se repetirá ${reminderData.repeatCount} veces)`
+      : '';
+    
+    console.log(`✅ Recordatorio programado para ${scheduledTime}${repeatInfo}`)
     
     return {
       success: true,
-      message: `✅ Recordatorio programado para ${new Date(reminderData.when.timestamp).toLocaleString('es-ES')}`,
+      message: `✅ Recordatorio programado para ${scheduledTime}${repeatInfo}`,
       jobId: job.id,
       when: reminderData.when.value,
       isRecurring: reminderData.isRecurring,
