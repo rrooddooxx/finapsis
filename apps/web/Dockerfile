@@ -1,5 +1,6 @@
-# Use the official Node.js image as base
-FROM node:18-alpine AS base
+# syntax=docker.io/docker/dockerfile:1
+
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -7,14 +8,19 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files
+# Copy lockfile and package.json files for monorepo
 COPY package.json bun.lockb* ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install dependencies with bun
-RUN npm install -g bun
-RUN bun install --frozen-lockfile
+# Install dependencies - convert bun lockfile to npm if needed
+RUN \
+  if [ -f bun.lockb ]; then \
+    # Use npm to install from package.json since we don't have bun in Node.js image
+    rm -f package-lock.json && npm install --legacy-peer-deps; \
+  elif [ -f package-lock.json ]; then npm ci; \
+  else echo "No lockfile found." && npm install --legacy-peer-deps; \
+  fi
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -22,53 +28,40 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the web application
-RUN npm install -g bun
-RUN cd apps/web && bun run build
+# Next.js collects completely anonymous telemetry data about general usage.
+# Learn more here: https://nextjs.org/telemetry
+# Uncomment the following line in case you want to disable telemetry during the build.
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Production image, copy all the files and run nginx
-FROM nginx:alpine AS runner
-WORKDIR /usr/share/nginx/html
+# Build the Next.js application
+RUN cd apps/web && npm run build
 
-# Remove default nginx static assets
-RUN rm -rf ./*
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
 
-# Copy built assets from builder stage
-COPY --from=builder /app/apps/web/dist .
+ENV NODE_ENV=production
+# Uncomment the following line in case you want to disable telemetry during runtime.
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copy nginx configuration
-COPY <<EOF /etc/nginx/conf.d/default.conf
-server {
-    listen 80;
-    server_name localhost;
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-    location / {
-        root /usr/share/nginx/html;
-        index index.html index.htm;
-        try_files \$uri \$uri/ /index.html;
-    }
+# Copy public assets
+COPY --from=builder /app/apps/web/public ./public
 
-    location /api {
-        proxy_pass http://api:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
-    }
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
 
-    # Health check endpoint
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-}
-EOF
+USER nextjs
 
-EXPOSE 80
+EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# server.js is created by next build from the standalone output
+# https://nextjs.org/docs/pages/api-reference/config/next-config-js/output
+CMD ["node", "server.js"]

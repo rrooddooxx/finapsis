@@ -1,12 +1,14 @@
 {
-  "name": "typeform-onboarding",
+  "name": "finapsis-web-vite",
   "version": "1.0.0",
   "type": "module",
+  "packageManager": "bun@1.1.38",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "dev": "bun run vite",
+    "build": "bun run vite build",
+    "start": "bun run vite preview",
+    "preview": "bun run vite preview",
+    "lint": "bun run eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "@ai-sdk/react": "^2.0.0",
@@ -21,6 +23,7 @@
     "ai": "^5.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "geist": "^1.3.0",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -33,14 +36,13 @@
     "@types/react-dom": "^18.2.7",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "@vitejs/plugin-react": "^4.0.3",
+    "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.14",
     "eslint": "^8.45.0",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.3",
     "postcss": "^8.4.27",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.0.2",
-    "vite": "^4.4.5"
+    "vite": "^5.0.8"
   }
 }
