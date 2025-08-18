@@ -6,6 +6,8 @@ import {ChatScreen} from "@/components/screens/chat.screen.tsx";
 import {RegisterScreen} from "@/components/screens/register.screen.tsx";
 import {LoginScreen} from "@/components/ui/LoginScreen.tsx";
 import {WelcomeScreen} from "@/components/screens/welcome.screen.tsx";
+import {TermsScreen} from "@/components/screens/terms.screen.tsx";
+import {PrivacyScreen} from "@/components/screens/privacy.screen.tsx";
 
 function App() {
     const [appState, setAppState] = useState<AppState>("welcome")
@@ -106,6 +108,12 @@ function App() {
                     userEmail={userEmail}
                 />
             )
+
+        case "terms":
+            return <TermsScreen onStateChange={handleStateChange}/>
+
+        case "privacy":
+            return <PrivacyScreen onStateChange={handleStateChange}/>
 
         default:
             return <WelcomeScreen onStateChange={handleStateChange}/>
