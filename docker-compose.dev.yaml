@@ -3,7 +3,7 @@
 
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     restart: unless-stopped
     environment:
       - REDIS_REPLICATION_MODE=master
@@ -12,34 +12,18 @@ services:
       - redis_data:/data
     ports:
       - "6379:6379"
-
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-      - HTTP_USER=dev
-      - HTTP_PASSWORD=dev123
-      - LOG_LEVEL=info
-    ports:
-      - "8081:8081"
-    depends_on:
-      - redis
     networks:
       - finapsis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  redis-cli:
-    image: redis:7.2-alpine
-    container_name: financial-assistant-redis-cli
-    command: redis-cli -h redis -p 6379
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - finapsis
-    profiles:
-      - cli # Start with: docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile cli up
-    stdin_open: true
-    tty: true
+networks:
+  finapsis:
+    driver: bridge
 
 volumes:
-  redis_data: {}
+  redis_data: { }

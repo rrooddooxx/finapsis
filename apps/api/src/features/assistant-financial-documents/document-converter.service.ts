@@ -2,7 +2,6 @@ import { devLogger } from "../../utils/logger.utils";
 import { ociProviderService } from "../../providers/oci/oci-provider.service";
 import { financialDocumentsConfig } from "./assistant-financial-documents.config";
 import { pdfConverterService } from "./pdf-converter.service";
-const pdf2pic = require("pdf2pic");
 const pdfPoppler = require("pdf-poppler");
 import * as fs from 'fs';
 import * as path from 'path';
@@ -225,7 +224,7 @@ export class DocumentConverterService {
   /**
    * Advanced PDF to Image conversion (implementation needed)
    * This would use libraries like:
-   * - pdf2pic (Node.js)
+   * - pdf-poppler (Node.js)
    * - pdf-poppler 
    * - Sharp for image processing
    * - Or OCI Vision Service for document conversion
@@ -233,9 +232,8 @@ export class DocumentConverterService {
   private async advancedPdfConversion(request: DocumentConversionRequest): Promise<string[]> {
     // TODO: Implement one of these approaches:
     
-    // Option 1: Use pdf2pic library
-    // const pdf2pic = require("pdf2pic");
-    // const convert = pdf2pic.fromBuffer(pdfBuffer, {
+    // Option 1: Use pdf-poppler library (implemented below)
+    // Uses poppler-utils for reliable PDF to image conversion
     //   density: 300,
     //   saveFilename: "page",
     //   savePath: "/tmp/",
@@ -280,7 +278,7 @@ export class DocumentConverterService {
   }
 
   /**
-   * Convert PDF buffer to base64 images using pdf2pic
+   * Convert PDF buffer to base64 images using pdf-poppler
    */
   private async convertPdfToBase64Images(pdfBuffer: Buffer, fileName: string): Promise<Array<{base64: string, mimeType: string, fileName?: string}>> {
     const tempDir = path.join(os.tmpdir(), 'pdf-conversion');
@@ -297,70 +295,32 @@ export class DocumentConverterService {
 
       devLogger('DocumentConverter', `🔄 Converting PDF: ${fileName} (${Math.round(pdfBuffer.length / 1024)}KB)`);
 
-      // Configure pdf2pic with explicit GraphicsMagick path and Ghostscript support
-      const convert = pdf2pic.fromPath(tempPdfPath, {
-        density: 150,           // Lower DPI for faster processing and compatibility
-        saveFilename: 'page',
-        savePath: tempDir,
+      // Use pdf-poppler for reliable Linux compatibility
+      const popplerOptions = {
         format: 'png',
-        width: 1200,           // Smaller size for better compatibility
-        height: 1600,
-        quality: 75,
-        graphicsMagick: true   // Use GraphicsMagick instead of ImageMagick
-      });
+        out_dir: tempDir,
+        out_prefix: 'page',
+        page: null, // Convert all pages
+        scale: 1200 // Width in pixels for good quality
+      };
 
-      let imageData: Array<{base64: string, mimeType: string, fileName?: string}>;
-      
-      try {
-        // Try pdf2pic first
-        const conversionResults = await convert.bulk(-1, { responseType: 'buffer' });
-        devLogger('DocumentConverter', `✅ PDF converted with pdf2pic - ${conversionResults.length} pages`);
+      const popplerResults = await pdfPoppler.convert(tempPdfPath, popplerOptions);
+      devLogger('DocumentConverter', `✅ PDF converted with pdf-poppler - ${popplerResults.length} pages`);
 
-        // Convert each page to base64
-        imageData = conversionResults.map((result: any, index: number) => {
-          const imageBuffer = result.buffer;
-          if (!imageBuffer) {
-            throw new Error(`Failed to get buffer for page ${index + 1}`);
-          }
-
-          const base64 = imageBuffer.toString('base64');
-          return {
-            base64,
-            mimeType: 'image/png',
-            fileName: `${fileName}_page_${index + 1}.png`
-          };
-        });
-
-      } catch (pdf2picError) {
-        devLogger('DocumentConverter', `⚠️ pdf2pic failed, trying pdf-poppler: ${pdf2picError}`);
+      // Convert poppler results to base64
+      const imageData = popplerResults.map((imagePath: string, index: number) => {
+        const imageBuffer = fs.readFileSync(imagePath);
+        const base64 = imageBuffer.toString('base64');
         
-        // Fallback to pdf-poppler
-        const popplerOptions = {
-          format: 'png',
-          out_dir: tempDir,
-          out_prefix: 'page',
-          page: null, // Convert all pages
-          scale: 1200 // Width in pixels
+        // Clean up the poppler-generated file
+        fs.unlinkSync(imagePath);
+        
+        return {
+          base64,
+          mimeType: 'image/png',
+          fileName: `${fileName}_page_${index + 1}.png`
         };
-
-        const popplerResults = await pdfPoppler.convert(tempPdfPath, popplerOptions);
-        devLogger('DocumentConverter', `✅ PDF converted with pdf-poppler - ${popplerResults.length} pages`);
-
-        // Convert poppler results to base64
-        imageData = popplerResults.map((imagePath: string, index: number) => {
-          const imageBuffer = fs.readFileSync(imagePath);
-          const base64 = imageBuffer.toString('base64');
-          
-          // Clean up the poppler-generated file
-          fs.unlinkSync(imagePath);
-          
-          return {
-            base64,
-            mimeType: 'image/png',
-            fileName: `${fileName}_page_${index + 1}.png`
-          };
-        });
-      }
+      });
 
       return imageData;
 
@@ -373,7 +333,7 @@ export class DocumentConverterService {
         if (fs.existsSync(tempPdfPath)) {
           fs.unlinkSync(tempPdfPath);
         }
-        // Clean up any generated image files
+        // Clean up any remaining generated image files
         const files = fs.readdirSync(tempDir);
         files.forEach(file => {
           if (file.startsWith('page') && file.endsWith('.png')) {

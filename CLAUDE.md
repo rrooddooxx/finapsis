@@ -612,3 +612,4 @@ Remember: The custom OCI provider is the key to leveraging Oracle Cloud credits 
      Direct quote from conversation: "I can see the issue now. The system is working great overall, but there's a specific problem with the OpenAI Vision API when 
   processing JPEG images. The error shows: 'OpenAI Vision ❌ Image analysis failed { error: "No object generated: response did not match schema." }'".
   Please continue the conversation from where we left it off without asking the user any further questions. Continue with the last task that you were asked to work on.
+- ALWAYS USE BUN IN THIS PROJECT!!!
