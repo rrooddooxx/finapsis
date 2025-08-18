@@ -20,3 +20,11 @@ yarn-error.log*
 node_modules
 **/node_modules
 **/**/node_modules
+
+.env.local
+.env
+**/.env
+**/**/.env
+
+# oci config env
+oci.config

@@ -16,6 +16,7 @@ import {
 } from "ai";
 import ReactMarkdown from "react-markdown";
 import { useRealtimeChat } from "@/hooks/useRealtimeChat";
+import { config } from "@/config";
 
 interface ChatScreenProps extends ScreenProps {
   onboardingData?: OnboardingData;
@@ -35,7 +36,7 @@ export function ChatScreen({
 
   const { messages, sendMessage, status, setMessages, append } = useChat({
     transport: new DefaultChatTransport({
-      api: `${import.meta.env.VITE_BACKEND_API_URL}/api/chat/ui`,
+      api: `${config.API_BASE_URL}/api/chat/ui`,
       headers: {
         "X-User-Email": userEmail || "demo-user",
       },

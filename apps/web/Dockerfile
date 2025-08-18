@@ -1,67 +1,98 @@
 # syntax=docker.io/docker/dockerfile:1
 
-FROM node:20-alpine AS base
+# Build stage - using Bun for faster builds
+FROM oven/bun:1 AS builder
 
-# Install dependencies only when needed
-FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy lockfile and package.json files for monorepo
-COPY package.json bun.lockb* ./
-COPY apps/web/package.json ./apps/web/
-COPY packages/shared/package.json ./packages/shared/
+# Copy package.json only
+COPY package.json ./
 
-# Install dependencies - convert bun lockfile to npm if needed
-RUN \
-  if [ -f bun.lockb ]; then \
-    # Use npm to install from package.json since we don't have bun in Node.js image
-    rm -f package-lock.json && npm install --legacy-peer-deps; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  else echo "No lockfile found." && npm install --legacy-peer-deps; \
-  fi
+# Install fresh dependencies (no lockfile)
+RUN bun install
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source code
 COPY . .
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-ENV NEXT_TELEMETRY_DISABLED=1
+# Build the Vite application
+RUN bun run build
 
-# Build the Next.js application
-RUN cd apps/web && npm run build
+# Production stage - Nginx
+FROM nginx:alpine AS production
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
+# Copy built files from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-ENV NODE_ENV=production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-ENV NEXT_TELEMETRY_DISABLED=1
+# Create startup script for environment variable substitution
+COPY <<EOF /docker-entrypoint.d/10-substitute-env.sh
+#!/bin/sh
+set -eu
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Replace environment variables in config.js
+envsubst '\$VITE_BACKEND_API_URL' < /usr/share/nginx/html/config.js > /tmp/config.js
+mv /tmp/config.js /usr/share/nginx/html/config.js
 
-# Copy public assets
-COPY --from=builder /app/apps/web/public ./public
+echo "Environment variables substituted in config.js"
+EOF
 
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
+RUN chmod +x /docker-entrypoint.d/10-substitute-env.sh
 
-USER nextjs
+# Copy custom nginx configuration
+COPY <<EOF /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
 
-EXPOSE 3000
+    root /usr/share/nginx/html;
+    index index.html;
 
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+    # Enable gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied expired no-cache no-store private auth;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
 
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/config/next-config-js/output
-CMD ["node", "server.js"]
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+    # Handle client-side routing (SPA)
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Don't cache HTML files
+    location ~* \.html$ {
+        expires -1;
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+    }
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+# Expose port 80
+EXPOSE 80
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:80/health || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

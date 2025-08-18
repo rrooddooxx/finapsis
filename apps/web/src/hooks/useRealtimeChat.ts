@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { Message } from '@ai-sdk/react';
+import { config } from '@/config';
 
 interface RealtimeMessage {
   id: string;
@@ -50,7 +51,7 @@ export function useRealtimeChat({
     console.log('🔌 Connecting to realtime chat stream...', { userEmail, enabled });
 
     const eventSource = new EventSource(
-      `${import.meta.env.VITE_BACKEND_API_URL}/api/chat/realtime/stream?userEmail=${encodeURIComponent(userEmail)}`,
+      `${config.API_BASE_URL}/api/chat/realtime/stream?userEmail=${encodeURIComponent(userEmail)}`,
       {
         // Add custom options for better connection handling
         withCredentials: false

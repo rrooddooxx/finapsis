@@ -1,53 +1,53 @@
 services:
   api:
-    image: ${REGISTRY:-docker.io}/${IMAGE_NAME_API:-financial-assistant-api}:${TAG:-latest}
+    image: widew3b/finapsis-api:${API_IMAGE_TAG:-latest}
     ports:
       - "3000:3000"
+    volumes:
+      - ~/.oci:/root/.oci:ro
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # Add environment variables from secrets
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
       - OCI_TENANCY_ID=${OCI_TENANCY_ID}
       - OCI_USER_ID=${OCI_USER_ID}
       - OCI_FINGERPRINT=${OCI_FINGERPRINT}
       - OCI_PRIVATE_KEY_PATH=${OCI_PRIVATE_KEY_PATH}
       - OCI_REGION=${OCI_REGION}
       - OCI_COMPARTMENT_ID=${OCI_COMPARTMENT_ID}
+      - OCI_NAMESPACE=${OCI_NAMESPACE}
+      - OCI_RESULTS_BUCKET=${OCI_RESULTS_BUCKET}
+      - OCI_DOCUMENTS_BUCKET_NAME=${OCI_DOCUMENTS_BUCKET_NAME}
+      - OCI_DOCUMENTS_BUCKET_OCID=${OCI_DOCUMENTS_BUCKET_OCID}
+      - OCI_STREAMING_ENDPOINT=${OCI_STREAMING_ENDPOINT}
+      - OCI_STREAM_NAME=${OCI_STREAM_NAME}
+      - OCI_DOCUMENT_STREAM_OCID=${OCI_DOCUMENT_STREAM_OCID}
+      - OCI_STREAM_POOL_NAME=${OCI_STREAM_POOL_NAME}
+      - OCI_STREAM_POOL_OCID=${OCI_STREAM_POOL_OCID}
+      - OCI_STREAM_POOL_FQDN=${OCI_STREAM_POOL_FQDN}
+      - OCI_CONSUMER_GROUP_NAME=${OCI_CONSUMER_GROUP_NAME}
+      - OCI_CONSUMER_INSTANCE=${OCI_CONSUMER_INSTANCE}
+      - APEX_BASE_URL=${APEX_BASE_URL}
+      - APEX_API_KEY=${APEX_API_KEY}
+      - AUTO_START_DOCUMENT_WORKER=${AUTO_START_DOCUMENT_WORKER}
     restart: unless-stopped
     networks:
-      - financial-assistant
+      - finapsis
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:3000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  web:
-    image: ${REGISTRY:-docker.io}/${IMAGE_NAME_WEB:-financial-assistant-web}:${TAG:-latest}
-    ports:
-      - "80:80"
-    depends_on:
-      - api
-    restart: unless-stopped
-    networks:
-      - financial-assistant
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:80/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
     restart: unless-stopped
     networks:
-      - financial-assistant
+      - finapsis
     volumes:
       - redis_data:/data
     healthcheck:
@@ -60,5 +60,5 @@ volumes:
   redis_data:
 
 networks:
-  financial-assistant:
+  finapsis:
     driver: bridge
