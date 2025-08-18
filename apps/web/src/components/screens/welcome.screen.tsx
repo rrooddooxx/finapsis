@@ -6,7 +6,7 @@ import type {ScreenProps} from "../../types"
 export function WelcomeScreen({onStateChange}: ScreenProps) {
     return (
         <div
-            className="min-h-screen bg-background flex items-center justify-center p-3 sm:p-4 lg:p-6">
+            className="min-h-screen bg-background flex flex-col items-center justify-center p-3 sm:p-4 lg:p-6 text-center">
             <Card className="w-full max-w-md shadow-xl border-border/50 backdrop-blur-sm">
                 <CardContent className="p-6 sm:p-8 text-center">
                     <div className="mb-6 sm:mb-8">
@@ -44,7 +44,17 @@ export function WelcomeScreen({onStateChange}: ScreenProps) {
                     </div>
 
                     <p className="text-xs sm:text-sm text-muted-foreground mt-6">
-                        ¿Primera vez aquí? Regístrate para comenzar
+                        Al continuar usando Finapsis, aceptas estos <button
+                        onClick={() => onStateChange("terms")}
+                        className="font-semibold text-primary hover:text-primary/80 underline underline-offset-2 transition-colors duration-200"
+                    >términos y condiciones</button>
+                        {" "}y nuestra{" "}
+                        <button
+                            onClick={() => onStateChange("privacy")}
+                            className="font-semibold text-primary hover:text-primary/80 underline underline-offset-2 transition-colors duration-200"
+                        >
+                            Políticas de Privacidad
+                        </button>
                     </p>
                 </CardContent>
             </Card>

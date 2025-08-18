@@ -20,7 +20,7 @@ export interface LoginData {
   password: string;
 }
 
-export type AppState = "welcome" | "login" | "register" | "chat";
+export type AppState = "welcome" | "login" | "register" | "chat" | "terms" | "privacy"
 
 export interface SlideData {
   id: number;
