@@ -21,4 +21,8 @@ node_modules
 **/node_modules
 **/**/node_modules
 .env.local
-.env.local
+.env
+
+
+# oci config env
+oci.config
